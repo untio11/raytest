@@ -4,6 +4,7 @@ import org.lwjgl.glfw.GLFWErrorCallback;
 import org.lwjgl.glfw.GLFWVidMode;
 import org.lwjgl.opengl.*;
 
+import java.awt.*;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
@@ -17,8 +18,10 @@ import static org.lwjgl.glfw.Callbacks.glfwFreeCallbacks;
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL12.GL_CLAMP_TO_EDGE;
 import static org.lwjgl.opengl.GL20C.*;
+import static org.lwjgl.opengl.GL30C.GL_RGBA32F;
 import static org.lwjgl.opengl.GL42C.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT;
 import static org.lwjgl.opengl.GL42C.glMemoryBarrier;
+import static org.lwjgl.opengl.GL42C.glTexStorage2D;
 import static org.lwjgl.opengl.GL43C.GL_COMPUTE_SHADER;
 import static org.lwjgl.opengl.GL43C.glDispatchCompute;
 import static org.lwjgl.system.MemoryUtil.NULL;
@@ -28,13 +31,13 @@ public class Main {
     private int width = 300;
     private int height = 300;
 
-    private int vaoId, VertexVBO, IndexVBO; // VAO and VBO's
+    private int vaoId, VertexVBO, IndexVBO, ColorVBO; // VAO and VBO's
     private int quadProgram, rayProgram; // Shader programs
     private int rayTexture; // Image for the raytracing
 
     float[] vertices = {
             -1f,  1f, 0f, 1f, // 1/6 -> ID:0
-            -0.51f, -0.51f, 0f, 1f, // 2   -> ID:1
+            -1f, -1f, 0f, 1f, // 2   -> ID:1
              1f, -1f, 0f, 1f, // 3/4 -> ID:2
              1f,  1f, 0f, 1f, // 5   -> ID:3
     };
@@ -42,6 +45,13 @@ public class Main {
     byte[] indices = {
             0, 1, 2,
             2, 3, 0
+    };
+
+    float[] colors = {
+            1f, 0f, 0f, 1f,
+            0f, 1f, 0f, 1f,
+            0f, 0f, 1f, 1f,
+            1f, 1f, 1f, 1f,
     };
 
     private Set<Integer> pressedKeys = new HashSet<>(); // To collect all pressed keys for processing
@@ -101,6 +111,7 @@ public class Main {
 
         FloatBuffer verticesBuffer = createBuffer(vertices);
         ByteBuffer indexBuffer = createBuffer(indices);
+        FloatBuffer colorBuffer = createBuffer(colors);
 
         VertexVBO = GL15.glGenBuffers();
         GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, VertexVBO);
@@ -109,28 +120,30 @@ public class Main {
         GL30.glVertexAttribPointer(0, 4, GL30.GL_FLOAT, false, 0, 0);
         GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
 
+        ColorVBO = GL15.glGenBuffers();
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, ColorVBO);
+        GL15.glBufferData(GL15.GL_ARRAY_BUFFER, colorBuffer, GL15.GL_STATIC_DRAW);
+
+        GL30.glVertexAttribPointer(1, 4, GL30.GL_FLOAT, false, 0, 0);
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
+
         IndexVBO = GL15.glGenBuffers();
         GL15.glBindBuffer(GL15.GL_ELEMENT_ARRAY_BUFFER, IndexVBO);
         GL15.glBufferData(GL15.GL_ELEMENT_ARRAY_BUFFER, indexBuffer, GL15.GL_STATIC_DRAW);
         GL15.glBindBuffer(GL15.GL_ELEMENT_ARRAY_BUFFER, 0);
+
+        GL30.glBindVertexArray(0);
     }
 
     private void setupTexture() {
         rayTexture = glGenTextures();
-        GL15.glActiveTexture(GL13.GL_TEXTURE0);
-        GL15.glBindTexture(GL_TEXTURE_2D, rayTexture);
-        GL15.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        GL15.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        GL15.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        GL15.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        GL15.glTexImage2D(GL_TEXTURE_2D, 0, GL30C.GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
-        GL43C.glBindImageTexture(0, rayTexture, 0, false, 0, GL15C.GL_WRITE_ONLY, GL30C.GL_RGBA32F);
+        glBindTexture(GL_TEXTURE_2D, rayTexture);
+        glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA32F, width, height);
+        glBindTexture(GL_TEXTURE_2D, 0);
     }
 
     private void createRayProgram() {
-        int ray_shader = GL43C.glCreateShader(GL_COMPUTE_SHADER);
-        glShaderSource(ray_shader, loadFile("src/main/resources/raytracer.glsl"));
-        glCompileShader(ray_shader);
+        int ray_shader = loadShader("src/main/resources/raytracer.glsl", GL_COMPUTE_SHADER);
 
         rayProgram = glCreateProgram();
         glAttachShader(rayProgram, ray_shader);
@@ -139,18 +152,20 @@ public class Main {
     }
 
     private void createQuadProgram() {
-        int vertexshader = GL43C.glCreateShader(GL_VERTEX_SHADER);
-        int fragmentshader = GL43C.glCreateShader(GL_FRAGMENT_SHADER);
-        glShaderSource(vertexshader, loadFile("src/main/resources/vertexshader.glsl"));
-        glShaderSource(fragmentshader, loadFile("src/main/resources/fragmentshader.glsl"));
+        int vertexshader = loadShader("src/main/resources/vertexshader.glsl", GL_VERTEX_SHADER);
+        int fragmentshader = loadShader("src/main/resources/fragmentshader.glsl", GL_FRAGMENT_SHADER);
 
         quadProgram = glCreateProgram();
         glAttachShader(quadProgram, vertexshader);
         glAttachShader(quadProgram, fragmentshader);
 
-        GL20.glBindAttribLocation(quadProgram, 0, "vertex"); // Position in (x,y)
+        GL20.glBindAttribLocation(quadProgram, 0, "position_in"); // Position in (x,y,z,w)
+        GL20.glBindAttribLocation(quadProgram, 1, "color_in");
+
         glLinkProgram(quadProgram);
         glValidateProgram(quadProgram);
+        System.out.println(GL20.glGetShaderInfoLog(vertexshader));
+        System.out.println(GL20.glGetShaderInfoLog(fragmentshader));
     }
 
     private void loop() {
@@ -160,42 +175,45 @@ public class Main {
 
         setupQuad();
         createQuadProgram();
-        setupTexture();
-        createRayProgram();
+        //setupTexture();
+        //createRayProgram();
 
         while (!glfwWindowShouldClose(window)) {
             render();
-            glUseProgram(0);
             glfwPollEvents();
         }
     }
 
     private void renderQuad() {
-        GL30.glBindVertexArray(vaoId);
-        GL20.glEnableVertexAttribArray(0);
+        glUseProgram(quadProgram);
+        //System.out.println(GL20.glGetProgramInfoLog(quadProgram));
+        //glActiveTexture(GL_TEXTURE0);
+        //glBindTexture(GL_TEXTURE_2D, rayTexture);
 
-        GL15.glBindBuffer(GL15.GL_ELEMENT_ARRAY_BUFFER, IndexVBO);
+        GL30.glBindVertexArray(vaoId);
+        GL20.glEnableVertexAttribArray(0); // Vertex position data
+        GL20.glEnableVertexAttribArray(1); // Vertex color data
+        GL15.glBindBuffer(GL15.GL_ELEMENT_ARRAY_BUFFER, IndexVBO); // Index data
 
         // Draw the vertices
         GL11.glDrawElements(GL11.GL_TRIANGLES, indices.length, GL11.GL_UNSIGNED_BYTE, 0);
 
         // Put everything back to default (deselect)
+        glUseProgram(0);
         GL15.glBindBuffer(GL15.GL_ELEMENT_ARRAY_BUFFER, 0);
         GL20.glDisableVertexAttribArray(0);
+        GL20.glDisableVertexAttribArray(1);
         GL30.glBindVertexArray(0);
     }
 
     private void render() {
         GL11.glClear(GL11.GL_COLOR_BUFFER_BIT | GL11.GL_DEPTH_BUFFER_BIT);
 
-        glUseProgram(rayProgram);
-        glDispatchCompute(width, height, 1);
+//        glUseProgram(rayProgram);
+//        glDispatchCompute(width, height, 1);
+//
+//        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
-        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-
-        glUseProgram(quadProgram);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, rayTexture);
         renderQuad();
 
         glfwSwapBuffers(window); // swap the color buffers
@@ -261,19 +279,23 @@ public class Main {
         return buffer;
     }
 
-    private String loadFile(String filename) {
-        StringBuilder shader = new StringBuilder();
-        String line = null ;
+    private int loadShader(String filename, int type) {
+        StringBuilder shader_source = new StringBuilder();
+        String line = null;
+
         try {
             BufferedReader reader = new BufferedReader(new FileReader(filename));
             while( (line = reader.readLine()) != null ) {
-                shader.append(line);
-                shader.append('\n');
+                shader_source.append(line);
+                shader_source.append('\n');
             }
         } catch(IOException e) {
             throw new IllegalArgumentException("unable to load shader from file ["+filename+"]");
         }
 
-        return shader.toString();
+        int shaderID = GL43C.glCreateShader(type);
+        GL43C.glShaderSource(shaderID, shader_source);
+        GL43C.glCompileShader(shaderID);
+        return shaderID;
     }
 }
