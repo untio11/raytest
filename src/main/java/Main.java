@@ -262,6 +262,7 @@ public class Main {
         GL11.glViewport(0, 0, width, height);
         this.width = width;
         this.height = height;
+        setupTexture();
     }
 
     private void handleKeys(Set<Integer> pressedKeys) {
