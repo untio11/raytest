@@ -137,18 +137,26 @@ public class Main {
 
     private void setupTexture() {
         rayTexture = glGenTextures();
-        glBindTexture(GL_TEXTURE_2D, rayTexture);
-        glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA32F, width, height);
-        glBindTexture(GL_TEXTURE_2D, 0);
+        GL15.glActiveTexture(GL13.GL_TEXTURE0);
+        GL15.glBindTexture(GL_TEXTURE_2D, rayTexture);
+        GL15.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        GL15.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        GL15.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        GL15.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        GL15.glTexImage2D(GL_TEXTURE_2D, 0, GL30C.GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
+        GL43C.glBindImageTexture(0, rayTexture, 0, false, 0, GL15C.GL_WRITE_ONLY, GL30C.GL_RGBA32F);
     }
 
     private void createRayProgram() {
         int ray_shader = loadShader("src/main/resources/raytracer.glsl", GL_COMPUTE_SHADER);
+        System.out.println(GL43.glGetShaderInfoLog(ray_shader));
 
         rayProgram = glCreateProgram();
         glAttachShader(rayProgram, ray_shader);
         glLinkProgram(rayProgram);
         glValidateProgram(rayProgram);
+
+        System.out.println(GL43.glGetProgramInfoLog(rayProgram));
     }
 
     private void createQuadProgram() {
@@ -164,6 +172,7 @@ public class Main {
 
         glLinkProgram(quadProgram);
         glValidateProgram(quadProgram);
+        System.out.println(GL20.glGetProgramInfoLog(quadProgram));
         System.out.println(GL20.glGetShaderInfoLog(vertexshader));
         System.out.println(GL20.glGetShaderInfoLog(fragmentshader));
     }
@@ -175,8 +184,8 @@ public class Main {
 
         setupQuad();
         createQuadProgram();
-        //setupTexture();
-        //createRayProgram();
+        setupTexture();
+        createRayProgram();
 
         while (!glfwWindowShouldClose(window)) {
             render();
@@ -186,9 +195,9 @@ public class Main {
 
     private void renderQuad() {
         glUseProgram(quadProgram);
-        //System.out.println(GL20.glGetProgramInfoLog(quadProgram));
-        //glActiveTexture(GL_TEXTURE0);
-        //glBindTexture(GL_TEXTURE_2D, rayTexture);
+
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, rayTexture);
 
         GL30.glBindVertexArray(vaoId);
         GL20.glEnableVertexAttribArray(0); // Vertex position data
@@ -209,10 +218,9 @@ public class Main {
     private void render() {
         GL11.glClear(GL11.GL_COLOR_BUFFER_BIT | GL11.GL_DEPTH_BUFFER_BIT);
 
-//        glUseProgram(rayProgram);
-//        glDispatchCompute(width, height, 1);
-//
-//        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+        glUseProgram(rayProgram);
+        glDispatchCompute(width, height, 1);
+        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
         renderQuad();
 

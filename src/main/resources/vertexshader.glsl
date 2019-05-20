@@ -13,5 +13,5 @@ void main() {
      * interval-mapping from [-1..+1] to [0..1]
      */
     tex_coord = position_in.xy * 0.5 + vec2(0.5, 0.5);
-    color_pass = color_in;
+    //color_pass = color_in;
 }

@@ -8,5 +8,5 @@ uniform sampler2D tex; // The image created by the raytracer (in theory)
 out vec4 color;
 
 void main() {
-    color = color_pass; //texture(tex, tex_coord);
+    color = texture(tex, tex_coord);
 }
