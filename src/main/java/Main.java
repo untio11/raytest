@@ -140,7 +140,7 @@ public class Main {
                     new Vector3f(
                             (generator.nextFloat() - 0.5f) * 10f,
                             (generator.nextFloat() - 0.5f) * 10f,
-                            (generator.nextFloat() - 0.5f) * 5f + 2f
+                            (generator.nextFloat() - 0.5f) * 5f + 7f
                     ),
                     generator.nextFloat() * 0.2f + 1,
                     new Vector3f(
@@ -238,9 +238,9 @@ public class Main {
         GL41.glProgramUniform3f(rayProgram, 0, camera[0], camera[1], camera[2]);
         for (int i = 0; i < scene.length; i++) {
             Sphere sphere = scene[i];
-            GL41.glProgramUniform3f(rayProgram, GL41.glGetUniformLocation(rayProgram, String.format("scene[%d].location", i)), sphere.center.x, sphere.center.y, sphere.center.z);
-            GL41.glProgramUniform3f(rayProgram, GL41.glGetUniformLocation(rayProgram, String.format("scene[%d].color", i)), sphere.color.x, sphere.color.y, sphere.color.z);
-            GL41.glProgramUniform1f(rayProgram, GL41.glGetUniformLocation(rayProgram, String.format("scene[%d].radius", i)), sphere.radius);
+            GL41.glProgramUniform3f(rayProgram, GL41.glGetUniformLocation(rayProgram, String.format("spheres[%d].location", i)), sphere.center.x, sphere.center.y, sphere.center.z);
+            GL41.glProgramUniform3f(rayProgram, GL41.glGetUniformLocation(rayProgram, String.format("spheres[%d].color", i)), sphere.color.x, sphere.color.y, sphere.color.z);
+            GL41.glProgramUniform1f(rayProgram, GL41.glGetUniformLocation(rayProgram, String.format("spheres[%d].radius", i)), sphere.radius);
         }
 
 

@@ -7,7 +7,12 @@ layout(location = 1) uniform struct {
     vec3 location;
     vec3 color;
     float radius;
-} scene[10];
+} spheres[10];
+
+vec3 plane[] = {
+    vec3(-2f, -2f, 0f),
+    vec3(2f, -2f, 4f)
+};
 
 vec3 direction;
 ivec2 pixel_coords;
@@ -16,7 +21,7 @@ vec3 sphere_center;
 float sphere_radius;
 
 vec4 trace() {
-    vec4 color = vec4(0.0, 0.0, 0.0, 1.0);
+    vec4 color = vec4(0.7, 0.91, 1.0, 1.0);
 
     // Get (x,y) position of this pixel in the texture (index in global work group)
     pixel_coords = ivec2(gl_GlobalInvocationID.xy);
@@ -30,8 +35,8 @@ vec4 trace() {
     float smallest = 1.0 / 0; // infinity (?)
 
     for (int i = 0; i < 10; i++) {
-        sphere_center = scene[i].location;
-        sphere_radius = scene[i].radius;
+        sphere_center = spheres[i].location;
+        sphere_radius = spheres[i].radius;
 
         vec3 omc = camera - sphere_center;
         float b = dot(omc, direction);
@@ -42,8 +47,15 @@ vec4 trace() {
         smallest = distance < smallest ? distance : smallest;
 
         if (smallest == distance && bsqmc >= 0.0) { // If the current sphere is the closest and it hits, color it
-            color = vec4(scene[i].color, 1.0);
+            color = vec4(spheres[i].color, 1.0);
         }
+    }
+
+    vec3 normal = vec3(0.0, 1.0, 0.0);
+    float d = ( dot((plane[0] - camera), normal) / dot(direction, normal) ); // find intersection with bottom plane
+
+    if (d >= 0.0 && length(d * direction + camera) <= smallest) {
+        color = vec4(0.4, 0.4, 0.4, 1.0);
     }
 
     return color;
