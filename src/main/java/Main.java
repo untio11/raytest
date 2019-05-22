@@ -55,6 +55,14 @@ public class Main {
             1f, 1f, 1f, 1f,
     };
 
+    Vector3f[] triangle = {
+            new Vector3f(0f, 0.5f, 0f),
+            new Vector3f(-0.5f, -0.5f, 0f),
+            new Vector3f(0.5f, 0.5f, 0f)
+    };
+
+    Vector3f triangle_normal = new Vector3f(0f, 0f, -1f);
+
     private Sphere[] scene = generateSpheres();
 
     private float[] camera = {0f, 0f, -1.2f};
