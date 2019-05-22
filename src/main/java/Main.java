@@ -116,6 +116,8 @@ public class Main {
         glfwMakeContextCurrent(window);
         // Enable v-sync
         glfwSwapInterval(0);
+
+        System.out.println("Compute shader " + glfwExtensionSupported("ARB_compute_shader"));
     }
 
     private void loop() {
@@ -145,7 +147,7 @@ public class Main {
     }
 
     private Sphere[] generateSpheres() {
-        Sphere[] spheres = new Sphere[10];
+        Sphere[] spheres = new Sphere[11];
         Random generator = new Random();
 
         for(int i = 0; i < 10; i++) {
@@ -163,6 +165,20 @@ public class Main {
                     )
             );
         }
+
+        spheres[10] = new Sphere(
+                new Vector3f(
+                        0f,
+                        10f,
+                        -2f
+                ),
+                1f,
+                new Vector3f(
+                        1f,
+                        1f,
+                        1f
+                )
+        );
 
         return spheres;
     }
@@ -209,9 +225,7 @@ public class Main {
 
         glLinkProgram(quadProgram);
         glValidateProgram(quadProgram);
-        System.out.println(GL20.glGetProgramInfoLog(quadProgram));
-        System.out.println(GL20.glGetShaderInfoLog(vertexshader));
-        System.out.println(GL20.glGetShaderInfoLog(fragmentshader));
+        System.out.println("[QuadProgram]: " + GL20.glGetProgramInfoLog(quadProgram));
     }
 
     private void setupTexture() {
@@ -228,14 +242,14 @@ public class Main {
 
     private void createRayProgram() {
         int ray_shader = loadShader("src/main/resources/raytracer.glsl", GL_COMPUTE_SHADER);
-        System.out.println(GL43.glGetShaderInfoLog(ray_shader));
+        System.out.println("[RayTracerShader]: " + GL43.glGetShaderInfoLog(ray_shader));
 
         rayProgram = glCreateProgram();
         glAttachShader(rayProgram, ray_shader);
         glLinkProgram(rayProgram);
         glValidateProgram(rayProgram);
 
-        System.out.println(GL43.glGetProgramInfoLog(rayProgram));
+        System.out.println("[RayTracerProgram]: " + GL43.glGetProgramInfoLog(rayProgram));
     }
 
     private void render() {
@@ -248,7 +262,7 @@ public class Main {
     }
 
     private void executeRay() {
-        GL41.glProgramUniform3f(rayProgram, 0, camera[0], camera[1], (float)(Math.sin(current_time) + 2) * camera[2]);
+        GL41.glProgramUniform3f(rayProgram, 0, camera[0], camera[1], camera[2]);
         for (int i = 0; i < scene.length; i++) {
             Sphere sphere = scene[i];
             GL41.glProgramUniform3f(rayProgram, GL41.glGetUniformLocation(rayProgram, String.format("spheres[%d].location", i)), sphere.center.x, sphere.center.y, sphere.center.z);
@@ -259,12 +273,13 @@ public class Main {
         int[] work_group_size = new int[3];
         GL20.glGetProgramiv(rayProgram, GL_COMPUTE_WORK_GROUP_SIZE, work_group_size);
 
-        int work_x = getNextPowerOfTwo(width / work_group_size[0]);
+        int work_x = getNextPowerOfTwo(width  / work_group_size[0]);
         int work_y = getNextPowerOfTwo(height / work_group_size[1]);
 
         glUseProgram(rayProgram);
         glDispatchCompute(work_x, work_y, 1);
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+        //System.out.println(glGetProgramInfoLog(rayProgram));
     }
 
     private void renderQuad() {
@@ -332,6 +347,27 @@ public class Main {
             switch (keyPressed) {
                 case GLFW_KEY_ESCAPE:
                     glfwSetWindowShouldClose(window, true);
+                    break;
+                case GLFW_KEY_F5:
+                    scene = generateSpheres();
+                case GLFW_KEY_DOWN:
+                    camera[1] -= 1f;
+                    break;
+                case  GLFW_KEY_UP:
+                    camera[1] += 1f;
+                    break;
+                case GLFW_KEY_LEFT:
+                    camera[0] -= 1f;
+                    break;
+                case  GLFW_KEY_RIGHT:
+                    camera[0] += 1f;
+                    break;
+                case GLFW_KEY_1:
+                    camera[2] -= 1f;
+                    break;
+                case  GLFW_KEY_2:
+                    camera[2] += 1f;
+                    break;
             }
         }
     }
@@ -370,7 +406,7 @@ public class Main {
         return shaderID;
     }
 
-    public static int getNextPowerOfTwo(int value) {
+    private static int getNextPowerOfTwo(int value) {
         int result = value;
         result -= 1;
         result |= result >> 16;
