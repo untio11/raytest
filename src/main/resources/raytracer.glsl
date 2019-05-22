@@ -3,17 +3,23 @@
 layout(local_size_x = 1, local_size_y = 1) in;
 layout(rgba32f, binding = 0) uniform image2D img_output;
 layout(location = 0) uniform vec3 camera;
+layout(location = 1) uniform struct {
+    vec3 location;
+    vec3 color;
+    float radius;
+} scene[10];
 
 vec3 direction;
+ivec2 pixel_coords;
 
-vec3 sphere_center = vec3(0.0, 0.0, 5);
-float sphere_radius = 2.5;
+vec3 sphere_center;
+float sphere_radius;
 
-void main() {
-    // Base pixel color
-    vec4 pixel_color = vec4(0.0, 0.0, 0.0, 1.0);
+vec4 trace() {
+    vec4 color = vec4(0.0, 0.0, 0.0, 1.0);
+
     // Get (x,y) position of this pixel in the texture (index in global work group)
-    ivec2 pixel_coords = ivec2(gl_GlobalInvocationID.xy);
+    pixel_coords = ivec2(gl_GlobalInvocationID.xy);
     ivec2 dimensions = imageSize(img_output);
 
     // Map pixel coordinates to normalized space: [-1,1]^2
@@ -21,16 +27,29 @@ void main() {
     float y = (float(pixel_coords.y * 2 - dimensions.y) / dimensions.y);
 
     direction = normalize(vec3(x, y, 0) - camera);
+    float smallest = 1.0 / 0; // infinity (?)
 
-    vec3 omc = camera - sphere_center;
-    float b = dot(omc, direction);
-    float c = dot(omc, omc) - sphere_radius * sphere_radius;
-    float bsqmc = b * b - c;
+    for (int i = 0; i < 10; i++) {
+        sphere_center = scene[i].location;
+        sphere_radius = scene[i].radius;
 
-    if (bsqmc >= 0.0) {
-        pixel_color = vec4(1.0, 0.0, 0.0, 1.0);
+        vec3 omc = camera - sphere_center;
+        float b = dot(omc, direction);
+        float c = dot(omc, omc) - sphere_radius * sphere_radius;
+        float bsqmc = b * b - c;
+
+        float distance = min(-b + sqrt(bsqmc), -b - sqrt(bsqmc));
+        smallest = distance < smallest ? distance : smallest;
+
+        if (smallest == distance && bsqmc >= 0.0) { // If the current sphere is the closest and it hits, color it
+            color = vec4(scene[i].color, 1.0);
+        }
     }
 
+    return color;
+}
+
+void main() {
     // Output the computed color to the pixel in the image
-    imageStore(img_output, pixel_coords, pixel_color);
+    imageStore(img_output, pixel_coords, trace());
 }

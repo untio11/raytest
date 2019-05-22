@@ -1,4 +1,5 @@
 import com.sun.javafx.collections.FloatArraySyncer;
+import org.joml.Vector3f;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.glfw.GLFWErrorCallback;
 import org.lwjgl.glfw.GLFWVidMode;
@@ -12,6 +13,7 @@ import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.util.HashSet;
+import java.util.Random;
 import java.util.Set;
 
 import static org.lwjgl.glfw.Callbacks.glfwFreeCallbacks;
@@ -58,7 +60,9 @@ public class Main {
             1f, 1f, 1f, 1f,
     };
 
-    private float[] camera = {0f, 0f, -3f};
+    private Sphere[] scene = generateSpheres();
+
+    private float[] camera = {0f, 0f, -1.2f};
 
     private Set<Integer> pressedKeys = new HashSet<>(); // To collect all pressed keys for processing
 
@@ -125,6 +129,29 @@ public class Main {
             render();
             glfwPollEvents();
         }
+    }
+
+    private Sphere[] generateSpheres() {
+        Sphere[] spheres = new Sphere[10];
+        Random generator = new Random();
+
+        for(int i = 0; i < 10; i++) {
+            spheres[i] = new Sphere(
+                    new Vector3f(
+                            (generator.nextFloat() - 0.5f) * 10f,
+                            (generator.nextFloat() - 0.5f) * 10f,
+                            (generator.nextFloat() - 0.5f) * 5f + 2f
+                    ),
+                    generator.nextFloat() * 0.2f + 1,
+                    new Vector3f(
+                            generator.nextFloat(),
+                            generator.nextFloat(),
+                            generator.nextFloat()
+                    )
+            );
+        }
+
+        return spheres;
     }
 
     private void setupQuad() {
@@ -208,7 +235,15 @@ public class Main {
     }
 
     private void executeRay() {
-        GL41.glProgramUniform3f(rayProgram, 0, camera[0], camera[1], (float) (Math.sin(time) + 1) * camera[2]);
+        GL41.glProgramUniform3f(rayProgram, 0, camera[0], camera[1], camera[2]);
+        for (int i = 0; i < scene.length; i++) {
+            Sphere sphere = scene[i];
+            GL41.glProgramUniform3f(rayProgram, GL41.glGetUniformLocation(rayProgram, String.format("scene[%d].location", i)), sphere.center.x, sphere.center.y, sphere.center.z);
+            GL41.glProgramUniform3f(rayProgram, GL41.glGetUniformLocation(rayProgram, String.format("scene[%d].color", i)), sphere.color.x, sphere.color.y, sphere.color.z);
+            GL41.glProgramUniform1f(rayProgram, GL41.glGetUniformLocation(rayProgram, String.format("scene[%d].radius", i)), sphere.radius);
+        }
+
+
         time += 0.01;
         glUseProgram(rayProgram);
 
