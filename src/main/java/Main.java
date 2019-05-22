@@ -107,7 +107,7 @@ public class Main {
         // Make the OpenGL context current
         glfwMakeContextCurrent(window);
         // Enable v-sync
-        glfwSwapInterval(1);
+        glfwSwapInterval(0);
     }
 
     private void loop() {
@@ -126,8 +126,8 @@ public class Main {
             current_time = glfwGetTime();
             frames++;
 
-            if (current_time - last_time > 5.0) { // Print average framerate every 5 seconds
-                System.out.println(String.format("%f ms/frame <=> %f frames/s", 5000d/((double) frames), (double)frames / 5d));
+            if (current_time - last_time > 1.0) { // Print average framerate every 5 seconds
+                System.out.println(String.format("%f ms/frame <=> %f frames/s", 1000d/((double) frames), (double)frames / 1d));
                 frames = 0;
                 last_time = glfwGetTime();
             }
@@ -240,14 +240,13 @@ public class Main {
     }
 
     private void executeRay() {
-        GL41.glProgramUniform3f(rayProgram, 0, camera[0], camera[1], (float)(Math.sin(movement_param) + 2) * camera[2]);
+        GL41.glProgramUniform3f(rayProgram, 0, camera[0], camera[1], (float)(Math.sin(current_time) + 2) * camera[2]);
         for (int i = 0; i < scene.length; i++) {
             Sphere sphere = scene[i];
             GL41.glProgramUniform3f(rayProgram, GL41.glGetUniformLocation(rayProgram, String.format("spheres[%d].location", i)), sphere.center.x, sphere.center.y, sphere.center.z);
             GL41.glProgramUniform3f(rayProgram, GL41.glGetUniformLocation(rayProgram, String.format("spheres[%d].color", i)), sphere.color.x, sphere.color.y, sphere.color.z);
             GL41.glProgramUniform1f(rayProgram, GL41.glGetUniformLocation(rayProgram, String.format("spheres[%d].radius", i)), sphere.radius);
         }
-        movement_param += 0.01;
 
         int[] work_group_size = new int[3];
         GL20.glGetProgramiv(rayProgram, GL_COMPUTE_WORK_GROUP_SIZE, work_group_size);
