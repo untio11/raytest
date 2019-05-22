@@ -1,17 +1,14 @@
-import com.sun.javafx.collections.FloatArraySyncer;
 import org.joml.Vector3f;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.glfw.GLFWErrorCallback;
 import org.lwjgl.glfw.GLFWVidMode;
 import org.lwjgl.opengl.*;
 
-import java.awt.*;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
-import java.nio.IntBuffer;
 import java.util.HashSet;
 import java.util.Random;
 import java.util.Set;
@@ -20,13 +17,10 @@ import static org.lwjgl.glfw.Callbacks.glfwFreeCallbacks;
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL12.GL_CLAMP_TO_EDGE;
 import static org.lwjgl.opengl.GL20C.*;
-import static org.lwjgl.opengl.GL30C.GL_RGBA32F;
-import static org.lwjgl.opengl.GL30C.glBindBufferBase;
 import static org.lwjgl.opengl.GL42C.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT;
 import static org.lwjgl.opengl.GL42C.glMemoryBarrier;
-import static org.lwjgl.opengl.GL42C.glTexStorage2D;
 import static org.lwjgl.opengl.GL43C.GL_COMPUTE_SHADER;
-import static org.lwjgl.opengl.GL43C.GL_SHADER_STORAGE_BUFFER;
+import static org.lwjgl.opengl.GL43C.GL_COMPUTE_WORK_GROUP_SIZE;
 import static org.lwjgl.opengl.GL43C.glDispatchCompute;
 import static org.lwjgl.system.MemoryUtil.NULL;
 
@@ -34,7 +28,8 @@ public class Main {
     private long window; // The window handle
     private int width = 300;
     private int height = 300;
-    private double time = 0d;
+    private double movement_param = 0d;
+    private double last_time, current_time;
 
     private int vaoId, VertexVBO, IndexVBO, ColorVBO; // VAO and VBO's
     private int quadProgram, rayProgram; // Shader programs
@@ -125,7 +120,17 @@ public class Main {
         setupTexture();
         createRayProgram();
 
+        last_time = glfwGetTime();
+        int frames = 0;
         while (!glfwWindowShouldClose(window)) {
+            current_time = glfwGetTime();
+            frames++;
+
+            if (current_time - last_time > 5.0) { // Print average framerate every 5 seconds
+                System.out.println(String.format("%f ms/frame <=> %f frames/s", 5000d/((double) frames), (double)frames / 5d));
+                frames = 0;
+                last_time = glfwGetTime();
+            }
             render();
             glfwPollEvents();
         }
@@ -235,20 +240,23 @@ public class Main {
     }
 
     private void executeRay() {
-        GL41.glProgramUniform3f(rayProgram, 0, camera[0], camera[1], camera[2]);
+        GL41.glProgramUniform3f(rayProgram, 0, camera[0], camera[1], (float)(Math.sin(movement_param) + 2) * camera[2]);
         for (int i = 0; i < scene.length; i++) {
             Sphere sphere = scene[i];
             GL41.glProgramUniform3f(rayProgram, GL41.glGetUniformLocation(rayProgram, String.format("spheres[%d].location", i)), sphere.center.x, sphere.center.y, sphere.center.z);
             GL41.glProgramUniform3f(rayProgram, GL41.glGetUniformLocation(rayProgram, String.format("spheres[%d].color", i)), sphere.color.x, sphere.color.y, sphere.color.z);
             GL41.glProgramUniform1f(rayProgram, GL41.glGetUniformLocation(rayProgram, String.format("spheres[%d].radius", i)), sphere.radius);
         }
+        movement_param += 0.01;
 
+        int[] work_group_size = new int[3];
+        GL20.glGetProgramiv(rayProgram, GL_COMPUTE_WORK_GROUP_SIZE, work_group_size);
 
-        time += 0.01;
+        int work_x = getNextPowerOfTwo(width / work_group_size[0]);
+        int work_y = getNextPowerOfTwo(height / work_group_size[1]);
+
         glUseProgram(rayProgram);
-
-
-        glDispatchCompute(width, height, 1);
+        glDispatchCompute(work_x, work_y, 1);
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     }
 
@@ -353,5 +361,16 @@ public class Main {
         GL43C.glShaderSource(shaderID, shader_source);
         GL43C.glCompileShader(shaderID);
         return shaderID;
+    }
+
+    public static int getNextPowerOfTwo(int value) {
+        int result = value;
+        result -= 1;
+        result |= result >> 16;
+        result |= result >> 8;
+        result |= result >> 4;
+        result |= result >> 2;
+        result |= result >> 1;
+        return result + 1;
     }
 }
