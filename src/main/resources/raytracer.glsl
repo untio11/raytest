@@ -2,11 +2,11 @@
 
 layout(local_size_x = 1, local_size_y = 1) in;
 layout(rgba32f, binding = 0) uniform image2D img_output;
+layout(location = 0) uniform vec3 camera;
 
-vec3 camera = vec3(0.0, 0.0, -0.1); // Later to be passed as uniform from the application
 vec3 direction;
 
-vec3 sphere_center = vec3(2.0, 2.0, 5);
+vec3 sphere_center = vec3(0.0, 0.0, 5);
 float sphere_radius = 2.5;
 
 void main() {

@@ -19,10 +19,12 @@ import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL12.GL_CLAMP_TO_EDGE;
 import static org.lwjgl.opengl.GL20C.*;
 import static org.lwjgl.opengl.GL30C.GL_RGBA32F;
+import static org.lwjgl.opengl.GL30C.glBindBufferBase;
 import static org.lwjgl.opengl.GL42C.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT;
 import static org.lwjgl.opengl.GL42C.glMemoryBarrier;
 import static org.lwjgl.opengl.GL42C.glTexStorage2D;
 import static org.lwjgl.opengl.GL43C.GL_COMPUTE_SHADER;
+import static org.lwjgl.opengl.GL43C.GL_SHADER_STORAGE_BUFFER;
 import static org.lwjgl.opengl.GL43C.glDispatchCompute;
 import static org.lwjgl.system.MemoryUtil.NULL;
 
@@ -30,10 +32,12 @@ public class Main {
     private long window; // The window handle
     private int width = 300;
     private int height = 300;
+    private double time = 0d;
 
     private int vaoId, VertexVBO, IndexVBO, ColorVBO; // VAO and VBO's
     private int quadProgram, rayProgram; // Shader programs
     private int rayTexture; // Image for the raytracing
+    private int cameraSSBO;
 
     float[] vertices = {
             -1f,  1f, 0f, 1f, // 1/6 -> ID:0
@@ -53,6 +57,8 @@ public class Main {
             0f, 0f, 1f, 1f,
             1f, 1f, 1f, 1f,
     };
+
+    private float[] camera = {0f, 0f, -3f};
 
     private Set<Integer> pressedKeys = new HashSet<>(); // To collect all pressed keys for processing
 
@@ -105,6 +111,22 @@ public class Main {
         glfwSwapInterval(1);
     }
 
+    private void loop() {
+        GL.createCapabilities();
+        GL11.glClearColor(0.4f, 0.3f, 0.9f, 0f);
+        GL11.glEnable(GL11.GL_DEPTH_TEST);
+
+        setupQuad();
+        createQuadProgram();
+        setupTexture();
+        createRayProgram();
+
+        while (!glfwWindowShouldClose(window)) {
+            render();
+            glfwPollEvents();
+        }
+    }
+
     private void setupQuad() {
         vaoId = GL30.glGenVertexArrays();
         GL30.glBindVertexArray(vaoId);
@@ -135,6 +157,23 @@ public class Main {
         GL30.glBindVertexArray(0);
     }
 
+    private void createQuadProgram() {
+        int vertexshader = loadShader("src/main/resources/vertexshader.glsl", GL_VERTEX_SHADER);
+        int fragmentshader = loadShader("src/main/resources/fragmentshader.glsl", GL_FRAGMENT_SHADER);
+
+        quadProgram = glCreateProgram();
+        glAttachShader(quadProgram, vertexshader);
+        glAttachShader(quadProgram, fragmentshader);
+
+        GL20.glBindAttribLocation(quadProgram, 0, "position_in"); // Position in (x,y,z,w)
+
+        glLinkProgram(quadProgram);
+        glValidateProgram(quadProgram);
+        System.out.println(GL20.glGetProgramInfoLog(quadProgram));
+        System.out.println(GL20.glGetShaderInfoLog(vertexshader));
+        System.out.println(GL20.glGetShaderInfoLog(fragmentshader));
+    }
+
     private void setupTexture() {
         rayTexture = glGenTextures();
         GL15.glActiveTexture(GL13.GL_TEXTURE0);
@@ -159,38 +198,23 @@ public class Main {
         System.out.println(GL43.glGetProgramInfoLog(rayProgram));
     }
 
-    private void createQuadProgram() {
-        int vertexshader = loadShader("src/main/resources/vertexshader.glsl", GL_VERTEX_SHADER);
-        int fragmentshader = loadShader("src/main/resources/fragmentshader.glsl", GL_FRAGMENT_SHADER);
+    private void render() {
+        GL11.glClear(GL11.GL_COLOR_BUFFER_BIT | GL11.GL_DEPTH_BUFFER_BIT);
 
-        quadProgram = glCreateProgram();
-        glAttachShader(quadProgram, vertexshader);
-        glAttachShader(quadProgram, fragmentshader);
+        executeRay();
+        renderQuad();
 
-        GL20.glBindAttribLocation(quadProgram, 0, "position_in"); // Position in (x,y,z,w)
-        GL20.glBindAttribLocation(quadProgram, 1, "color_in");
-
-        glLinkProgram(quadProgram);
-        glValidateProgram(quadProgram);
-        System.out.println(GL20.glGetProgramInfoLog(quadProgram));
-        System.out.println(GL20.glGetShaderInfoLog(vertexshader));
-        System.out.println(GL20.glGetShaderInfoLog(fragmentshader));
+        glfwSwapBuffers(window); // swap the color buffers
     }
 
-    private void loop() {
-        GL.createCapabilities();
-        GL11.glClearColor(0.4f, 0.3f, 0.9f, 0f);
-        GL11.glEnable(GL11.GL_DEPTH_TEST);
+    private void executeRay() {
+        GL41.glProgramUniform3f(rayProgram, 0, camera[0], camera[1], (float) (Math.sin(time) + 1) * camera[2]);
+        time += 0.01;
+        glUseProgram(rayProgram);
 
-        setupQuad();
-        createQuadProgram();
-        setupTexture();
-        createRayProgram();
 
-        while (!glfwWindowShouldClose(window)) {
-            render();
-            glfwPollEvents();
-        }
+        glDispatchCompute(width, height, 1);
+        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     }
 
     private void renderQuad() {
@@ -213,18 +237,6 @@ public class Main {
         GL20.glDisableVertexAttribArray(0);
         GL20.glDisableVertexAttribArray(1);
         GL30.glBindVertexArray(0);
-    }
-
-    private void render() {
-        GL11.glClear(GL11.GL_COLOR_BUFFER_BIT | GL11.GL_DEPTH_BUFFER_BIT);
-
-        glUseProgram(rayProgram);
-        glDispatchCompute(width, height, 1);
-        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-
-        renderQuad();
-
-        glfwSwapBuffers(window); // swap the color buffers
     }
 
     private void clean() {
