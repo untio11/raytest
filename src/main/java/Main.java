@@ -139,7 +139,7 @@ public class Main {
     }
 
     private Sphere[] generateSpheres() {
-        Sphere[] spheres = new Sphere[10];
+        Sphere[] spheres = new Sphere[11];
         Random generator = new Random();
 
         for(int i = 0; i < 10; i++) {
@@ -157,6 +157,20 @@ public class Main {
                     )
             );
         }
+
+        spheres[10] = new Sphere(
+                new Vector3f(
+                        0f,
+                        10f,
+                        -2f
+                ),
+                1f,
+                new Vector3f(
+                        1f,
+                        1f,
+                        1f
+                )
+        );
 
         return spheres;
     }
@@ -240,7 +254,7 @@ public class Main {
     }
 
     private void executeRay() {
-        GL41.glProgramUniform3f(rayProgram, 0, camera[0], camera[1], (float)(Math.sin(current_time) + 2) * camera[2]);
+        GL41.glProgramUniform3f(rayProgram, 0, camera[0], camera[1], camera[2]);
         for (int i = 0; i < scene.length; i++) {
             Sphere sphere = scene[i];
             GL41.glProgramUniform3f(rayProgram, GL41.glGetUniformLocation(rayProgram, String.format("spheres[%d].location", i)), sphere.center.x, sphere.center.y, sphere.center.z);
@@ -325,6 +339,27 @@ public class Main {
             switch (keyPressed) {
                 case GLFW_KEY_ESCAPE:
                     glfwSetWindowShouldClose(window, true);
+                    break;
+                case GLFW_KEY_F5:
+                    scene = generateSpheres();
+                case GLFW_KEY_DOWN:
+                    camera[1] -= 1f;
+                    break;
+                case  GLFW_KEY_UP:
+                    camera[1] += 1f;
+                    break;
+                case GLFW_KEY_LEFT:
+                    camera[0] -= 1f;
+                    break;
+                case  GLFW_KEY_RIGHT:
+                    camera[0] += 1f;
+                    break;
+                case GLFW_KEY_1:
+                    camera[2] -= 1f;
+                    break;
+                case  GLFW_KEY_2:
+                    camera[2] += 1f;
+                    break;
             }
         }
     }
