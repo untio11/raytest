@@ -9,10 +9,7 @@ layout(location = 1) uniform struct {
     float radius;
 } spheres[10];
 
-vec3 plane[] = {
-    vec3(-2f, -2f, 0f),
-    vec3(2f, -2f, 4f)
-};
+vec3 planepoint = vec3(0.0, -2.0, 0.0);
 
 vec3 direction;
 ivec2 pixel_coords;
@@ -52,7 +49,7 @@ vec4 trace() {
     }
 
     vec3 normal = vec3(0.0, 1.0, 0.0);
-    float d = ( dot((plane[0] - camera), normal) / dot(direction, normal) ); // find intersection with bottom plane
+    float d = ( dot((planepoint - camera), normal) / dot(direction, normal) ); // find intersection with bottom plane
 
     if (d >= 0.0 && length(d * direction + camera) <= smallest) {
         color = vec4(0.4, 0.4, 0.4, 1.0);
