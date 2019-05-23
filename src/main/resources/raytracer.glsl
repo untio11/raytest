@@ -35,9 +35,10 @@ vec4 shadowBounce(vec3 origin) {
         sphere_center = spheres[i].location;
         sphere_radius = spheres[i].radius;
 
-        float discriminant = discriminant(direction, origin, sphere_center, sphere_radius).z;
+        vec3 disc = discriminant(direction, origin, sphere_center, sphere_radius);
+        float distance = min(-disc.x + sqrt(disc.z), -disc.x - sqrt(disc.z));
 
-        if (discriminant < 0) continue;
+        if (disc.z < 0 || distance <= 0) continue;
 
         return vec4(0.0, 0.0, 0.0, 0.0);
     }
@@ -74,7 +75,7 @@ vec4 trace() {
         float distance = min(-disc.x + sqrt(disc.z), -disc.x - sqrt(disc.z));
         smallest = distance < smallest ? distance : smallest;
 
-        if (smallest == distance) { // If the current sphere is the closest and it hits, color it
+        if (distance >= 0 && smallest == distance) { // If the current sphere is the closest and it hits, color it
             vec3 intersection = distance * direction;
             color = vec4(spheres[i].color, 1.0);// * shadowBounce(intersection);
         }
@@ -85,7 +86,8 @@ vec4 trace() {
 
     float d = (dot((planepoint - camera), normal) / ndotu ); // find intersection with bottom plane
     intersection = d * direction + camera;
-    if (d >= 0.0 && length(intersection) <= smallest && intersection.z > planepoint.z) {
+
+    if (d >= 0.0  && d <= smallest) {
         color = vec4(0.4, 0.4, 0.4, 1.0) * shadowBounce(intersection);
     }
 
