@@ -55,13 +55,17 @@ public class Main {
             1f, 1f, 1f, 1f,
     };
 
-    Vector3f[] triangle = {
-            new Vector3f(0f, 0.5f, 0f),
-            new Vector3f(-0.5f, -0.5f, 0f),
-            new Vector3f(0.5f, 0.5f, 0f)
-    };
-
-    Vector3f triangle_normal = new Vector3f(0f, 0f, -1f);
+    Triangle trig = new Triangle(
+            new Vector3f[] {
+                new Vector3f(0f, 0.5f, 0f),
+                new Vector3f(-0.5f, -0.5f, 0f),
+                new Vector3f(0.5f, 0.5f, 0f)
+            }, new Vector3f[] {
+                    new Vector3f(0f, 0f, -1f),
+                    new Vector3f(0f, 0f, -1f),
+                    new Vector3f(0f, 0f, -1f)
+            }
+    );
 
     private Sphere[] scene = generateSpheres();
 
@@ -157,7 +161,7 @@ public class Main {
                             (generator.nextFloat() - 0.5f) * 10f,
                             (generator.nextFloat() - 0.5f) * 5f + 7f
                     ),
-                    generator.nextFloat() * 0.2f + 1,
+                    generator.nextFloat() * 0.2f + 0.6f,
                     new Vector3f(
                             generator.nextFloat(),
                             generator.nextFloat(),
@@ -350,23 +354,24 @@ public class Main {
                     break;
                 case GLFW_KEY_F5:
                     scene = generateSpheres();
+                    break;
                 case GLFW_KEY_DOWN:
-                    camera[1] -= 1f;
+                    camera[1] -= 0.99f;
                     break;
                 case  GLFW_KEY_UP:
-                    camera[1] += 1f;
+                    camera[1] += 0.99f;
                     break;
                 case GLFW_KEY_LEFT:
-                    camera[0] -= 1f;
+                    camera[0] -= 0.99f;
                     break;
                 case  GLFW_KEY_RIGHT:
-                    camera[0] += 1f;
+                    camera[0] += 0.99f;
                     break;
                 case GLFW_KEY_1:
-                    camera[2] -= 1f;
+                    camera[2] -= 0.99f;
                     break;
                 case  GLFW_KEY_2:
-                    camera[2] += 1f;
+                    camera[2] += 0.99f;
                     break;
             }
         }
