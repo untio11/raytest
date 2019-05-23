@@ -72,12 +72,13 @@ public class Main {
     private float[] lights = {
             -10f,  7f, 0f,
              10f,  7f, 0f,
-              0f,  7f, 10f
+              0f,  7f, 20f
     };
 
     private boolean[] lightswitch = {true, true, true}; // Toggle light activity
 
     private Vector3f camera = new Vector3f(0f, 0f, -2f);
+    private float fov = 1.2f; // Camera to viewport distance. smaller fov => wider viewangle
     private Vector3f forward = new Vector3f(0f, 0f, 1f);
     private Vector3f up = new Vector3f(0f, 1f, 0f);
     private Vector3f right = new Vector3f(1f, 0f, 0f);
@@ -180,7 +181,8 @@ public class Main {
                             generator.nextFloat(),
                             generator.nextFloat(),
                             generator.nextFloat()
-                    )
+                    ),
+                    generator.nextFloat() * 75f + 1f
             );
         }
 
@@ -267,7 +269,8 @@ public class Main {
 
     private void executeRay() {
         GL41.glProgramUniform3f(rayProgram, 0, camera.x, camera.y, camera.z);
-        GL41.glProgramUniformMatrix3fv(rayProgram, 1, false, new float[] {
+        GL41.glProgramUniform1f(rayProgram, 1, fov);
+        GL41.glProgramUniformMatrix3fv(rayProgram, 2, false, new float[] {
                 right.x, right.y, right.z,
                 up.x, up.y, up.z,
                 forward.x, forward.y, forward.z
@@ -278,6 +281,7 @@ public class Main {
             GL41.glProgramUniform3f(rayProgram, GL41.glGetUniformLocation(rayProgram, String.format("spheres[%d].location", i)), sphere.center.x, sphere.center.y, sphere.center.z);
             GL41.glProgramUniform3f(rayProgram, GL41.glGetUniformLocation(rayProgram, String.format("spheres[%d].color", i)), sphere.color.x, sphere.color.y, sphere.color.z);
             GL41.glProgramUniform1f(rayProgram, GL41.glGetUniformLocation(rayProgram, String.format("spheres[%d].radius", i)), sphere.radius);
+            GL41.glProgramUniform1f(rayProgram, GL41.glGetUniformLocation(rayProgram, String.format("spheres[%d].shininess", i)), sphere.shininess);
         }
 
         for (int i = 0; i < lights.length / 3; i++) {
@@ -341,7 +345,7 @@ public class Main {
     }
 
     private void KeyCallback(long window, int key, int scancode, int action, int mods) {
-        if (action == GLFW_PRESS || action == GLFW_REPEAT) {
+        if (action == GLFW_PRESS) {
             pressedKeys.add(key);
         } else if (action == GLFW_RELEASE) {
             pressedKeys.remove(key);
@@ -358,6 +362,8 @@ public class Main {
     }
 
     private void handleKeys(Set<Integer> pressedKeys) {
+        Set<Integer> toRemove = new HashSet<>();
+
         for (int keyPressed : pressedKeys) {
             switch (keyPressed) {
                 case GLFW_KEY_ESCAPE:
@@ -365,61 +371,69 @@ public class Main {
                     break;
                 case GLFW_KEY_F5:
                     scene = generateSpheres();
+                    toRemove.add(keyPressed);
                     break;
                 case GLFW_KEY_DOWN:
-                    camera.y = Math.max(camera.y - 0.1f, -5.9f);
+                    camera.y = Math.max(camera.y - 0.05f, -5.9f);
                     break;
                 case  GLFW_KEY_UP:
-                    camera.y += 0.1f;
+                    camera.y += 0.05f;
                     break;
                 case GLFW_KEY_LEFT:
-                    camera.x -= 0.1f;
+                    camera.x -= 0.05f;
                     break;
                 case  GLFW_KEY_RIGHT:
-                    camera.x += 0.1f;
+                    camera.x += 0.05f;
                     break;
                 case GLFW_KEY_S:
-                    camera.z -= 0.1f;
+                    camera.z -= 0.05f;
                     break;
                 case GLFW_KEY_W:
-                    camera.z += 0.1f ;
+                    camera.z += 0.05f ;
                     break;
                 case GLFW_KEY_F1:
                     lightswitch[0] = !lightswitch[0];
+                    toRemove.add(keyPressed);
                     break;
                 case GLFW_KEY_F2:
                     lightswitch[1] = !lightswitch[1];
+                    toRemove.add(keyPressed);
                     break;
                 case GLFW_KEY_F3:
                     lightswitch[2] = !lightswitch[2];
+                    toRemove.add(keyPressed);
                     break;
                 case GLFW_KEY_KP_4:
-                    forward = forward.rotateY(0.05f);
-                    up =      up.rotateY(0.05f);
-                    right =   right.rotateY(0.05f);
+                    forward = forward.rotateY(0.01f);
+                    up =      up.rotateY(0.01f);
+                    right =   right.rotateY(0.01f);
                     break;
                 case GLFW_KEY_KP_6:
-                    forward = forward.rotateY(-0.05f);
-                    up =      up.rotateY(-0.05f);
-                    right =   right.rotateY(-0.05f);
+                    forward = forward.rotateY(-0.01f);
+                    up =      up.rotateY(-0.01f);
+                    right =   right.rotateY(-0.01f);
                     break;
                 case GLFW_KEY_KP_8:
-                    forward = forward.rotateX(0.05f);
-                    up =      up.rotateX(0.05f);
-                    right =   right.rotateX(0.05f);
+                    forward = forward.rotateX(0.01f);
+                    up =      up.rotateX(0.01f);
+                    right =   right.rotateX(0.01f);
                     break;
                 case GLFW_KEY_KP_2:
-                    forward = forward.rotateX(-0.05f);
-                    up =      up.rotateX(-0.05f);
-                    right =   right.rotateX(-0.05f);
+                    forward = forward.rotateX(-0.01f);
+                    up =      up.rotateX(-0.01f);
+                    right =   right.rotateX(-0.01f);
                     break;
                 case GLFW_KEY_EQUAL:
-                    forward.z += 0.05;
+                    fov += 0.02;
                     break;
                 case GLFW_KEY_MINUS:
-                    forward.z = Math.max(forward.z - 0.05f, 0.2f);
+                    fov = Math.max(fov - 0.02f, 0.2f);
                     break;
             }
+        }
+
+        for (Integer key : toRemove) {
+            pressedKeys.remove(key);
         }
     }
 
