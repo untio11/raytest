@@ -69,10 +69,10 @@ vec4 trace() {
         sphere_radius = spheres[i].radius;
 
         vec3 disc = discriminant(direction, camera, sphere_center, sphere_radius);
-
-        if (disc.z < 0) continue; // no intersection
-
         float distance = min(-disc.x + sqrt(disc.z), -disc.x - sqrt(disc.z));
+
+        if (disc.z < 0 || distance <= 0) continue; // no intersection
+
         smallest = distance < smallest ? distance : smallest;
 
         if (distance >= 0 && smallest == distance) { // If the current sphere is the closest and it hits, color it
