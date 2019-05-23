@@ -26,8 +26,8 @@ import static org.lwjgl.system.MemoryUtil.NULL;
 
 public class Main {
     private long window; // The window handle
-    private int width = 300;
-    private int height = 300;
+    private int width = 1280;
+    private int height = 720;
     private double movement_param = 0d;
     private double last_time, current_time;
 
@@ -69,7 +69,18 @@ public class Main {
 
     private Sphere[] scene = generateSpheres();
 
-    private float[] camera = {0f, 0f, -1.2f};
+    private float[] lights = {
+            -10f,  7f, 0f,
+             10f,  7f, 0f
+    };
+
+    private boolean[] lightswitch = {true, true}; // Toggle light activity
+
+    private Vector3f camera = new Vector3f(0f, 0f, -2f);
+    private Vector3f forward = new Vector3f(0f, 0f, 1f);
+    private Vector3f up = new Vector3f(0f, 1f, 0f);
+    private Vector3f right = new Vector3f(1f, 0f, 0f);
+
 
     private Set<Integer> pressedKeys = new HashSet<>(); // To collect all pressed keys for processing
 
@@ -102,6 +113,7 @@ public class Main {
         if (window == NULL) {
             throw new RuntimeException("Failed to create the GLFW window");
         }
+        glfwSetWindowAspectRatio(window, 16, 9);
 
         // Remember key state until it has been handled (AKA doesn't miss a key press)
         glfwSetInputMode(window, GLFW_STICKY_KEYS, GLFW_TRUE);
@@ -151,7 +163,7 @@ public class Main {
     }
 
     private Sphere[] generateSpheres() {
-        Sphere[] spheres = new Sphere[11];
+        Sphere[] spheres = new Sphere[10];
         Random generator = new Random();
 
         for(int i = 0; i < 10; i++) {
@@ -169,20 +181,6 @@ public class Main {
                     )
             );
         }
-
-        spheres[10] = new Sphere(
-                new Vector3f(
-                        0f,
-                        10f,
-                        -2f
-                ),
-                1f,
-                new Vector3f(
-                        1f,
-                        1f,
-                        1f
-                )
-        );
 
         return spheres;
     }
@@ -266,12 +264,23 @@ public class Main {
     }
 
     private void executeRay() {
-        GL41.glProgramUniform3f(rayProgram, 0, camera[0], camera[1], camera[2]);
+        GL41.glProgramUniform3f(rayProgram, 0, camera.x, camera.y, camera.z);
+        GL41.glProgramUniformMatrix3fv(rayProgram, 1, false, new float[] {
+                right.x, right.y, right.z,
+                up.x, up.y, up.z,
+                forward.x, forward.y, forward.z
+        });
+
         for (int i = 0; i < scene.length; i++) {
             Sphere sphere = scene[i];
             GL41.glProgramUniform3f(rayProgram, GL41.glGetUniformLocation(rayProgram, String.format("spheres[%d].location", i)), sphere.center.x, sphere.center.y, sphere.center.z);
             GL41.glProgramUniform3f(rayProgram, GL41.glGetUniformLocation(rayProgram, String.format("spheres[%d].color", i)), sphere.color.x, sphere.color.y, sphere.color.z);
             GL41.glProgramUniform1f(rayProgram, GL41.glGetUniformLocation(rayProgram, String.format("spheres[%d].radius", i)), sphere.radius);
+        }
+
+        for (int i = 0; i < lights.length / 3; i++) {
+            GL41.glProgramUniform3f(rayProgram, GL41.glGetUniformLocation(rayProgram, String.format("lights[%d].location", i)), lights[(3 * i)], lights[(3 * i) + 1], lights[(3 * i) + 2]);
+            GL41.glProgramUniform1i(rayProgram, GL41.glGetUniformLocation(rayProgram, String.format("lights[%d].toggle", i)), lightswitch[i] ? 1 : 0);
         }
 
         int[] work_group_size = new int[3];
@@ -356,22 +365,54 @@ public class Main {
                     scene = generateSpheres();
                     break;
                 case GLFW_KEY_DOWN:
-                    camera[1] -= 0.99f;
+                    camera.y = Math.max(camera.y - 0.99f, -5.9f);
                     break;
                 case  GLFW_KEY_UP:
-                    camera[1] += 0.99f;
+                    camera.y += 0.99f;
                     break;
                 case GLFW_KEY_LEFT:
-                    camera[0] -= 0.99f;
+                    camera.x -= 0.99f;
                     break;
                 case  GLFW_KEY_RIGHT:
-                    camera[0] += 0.99f;
+                    camera.x += 0.99f;
                     break;
-                case GLFW_KEY_1:
-                    camera[2] -= 0.99f;
+                case GLFW_KEY_S:
+                    camera.z -= 0.99f;
                     break;
-                case  GLFW_KEY_2:
-                    camera[2] += 0.99f;
+                case GLFW_KEY_W:
+                    camera.z += 0.3f ;
+                    break;
+                case GLFW_KEY_F1:
+                    lightswitch[0] = !lightswitch[0];
+                    break;
+                case GLFW_KEY_F2:
+                    lightswitch[1] = !lightswitch[1];
+                    break;
+                case GLFW_KEY_KP_4:
+                    forward = forward.rotateY(0.05f);
+                    up =      up.rotateY(0.05f);
+                    right =   right.rotateY(0.05f);
+                    break;
+                case GLFW_KEY_KP_6:
+                    forward = forward.rotateY(-0.05f);
+                    up =      up.rotateY(-0.05f);
+                    right =   right.rotateY(-0.05f);
+                    break;
+                case GLFW_KEY_KP_8:
+                    forward = forward.rotateX(0.05f);
+                    up =      up.rotateX(0.05f);
+                    right =   right.rotateX(0.05f);
+                    break;
+                case GLFW_KEY_KP_2:
+                    forward = forward.rotateX(-0.05f);
+                    up =      up.rotateX(-0.05f);
+                    right =   right.rotateX(-0.05f);
+                    break;
+                case GLFW_KEY_EQUAL:
+                    forward.z += 0.05;
+                    break;
+                case GLFW_KEY_MINUS:
+                    forward.z = Math.max(forward.z - 0.05f, 0.2f);
                     break;
             }
         }
