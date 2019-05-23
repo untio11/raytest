@@ -342,6 +342,7 @@ public class Main {
                     break;
                 case GLFW_KEY_F5:
                     scene = generateSpheres();
+                    break;
                 case GLFW_KEY_DOWN:
                     camera[1] -= 1f;
                     break;
