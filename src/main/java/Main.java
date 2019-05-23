@@ -29,7 +29,7 @@ public class Main {
     private int width = 1280;
     private int height = 720;
     private double movement_param = 0d;
-    private double last_time, current_time;
+    private double last_time, current_time, delta;
 
     private int vaoId, VertexVBO, IndexVBO, ColorVBO; // VAO and VBO's
     private int quadProgram, rayProgram; // Shader programs
@@ -71,10 +71,11 @@ public class Main {
 
     private float[] lights = {
             -10f,  7f, 0f,
-             10f,  7f, 0f
+             10f,  7f, 0f,
+              0f,  7f, 10f
     };
 
-    private boolean[] lightswitch = {true, true}; // Toggle light activity
+    private boolean[] lightswitch = {true, true, true}; // Toggle light activity
 
     private Vector3f camera = new Vector3f(0f, 0f, -2f);
     private Vector3f forward = new Vector3f(0f, 0f, 1f);
@@ -116,7 +117,7 @@ public class Main {
         glfwSetWindowAspectRatio(window, 16, 9);
 
         // Remember key state until it has been handled (AKA doesn't miss a key press)
-        glfwSetInputMode(window, GLFW_STICKY_KEYS, GLFW_TRUE);
+        //glfwSetInputMode(window, GLFW_STICKY_KEYS, GLFW_TRUE);
         glfwSetKeyCallback(window, this::KeyCallback);
         glfwSetWindowSizeCallback(window, this::windowSizeCallback);
 
@@ -131,7 +132,7 @@ public class Main {
         // Make the OpenGL context current
         glfwMakeContextCurrent(window);
         // Enable v-sync
-        glfwSwapInterval(0);
+        glfwSwapInterval(1);
 
         System.out.println("Compute shader " + glfwExtensionSupported("ARB_compute_shader"));
     }
@@ -159,6 +160,7 @@ public class Main {
             }
             render();
             glfwPollEvents();
+            handleKeys(pressedKeys);
         }
     }
 
@@ -339,13 +341,13 @@ public class Main {
     }
 
     private void KeyCallback(long window, int key, int scancode, int action, int mods) {
-        if (action == GLFW_PRESS) {
+        if (action == GLFW_PRESS || action == GLFW_REPEAT) {
             pressedKeys.add(key);
         } else if (action == GLFW_RELEASE) {
             pressedKeys.remove(key);
         }
 
-        handleKeys(pressedKeys);
+        //handleKeys(pressedKeys);
     }
 
     private void windowSizeCallback(long window, int width, int height) {
@@ -365,28 +367,31 @@ public class Main {
                     scene = generateSpheres();
                     break;
                 case GLFW_KEY_DOWN:
-                    camera.y = Math.max(camera.y - 0.99f, -5.9f);
+                    camera.y = Math.max(camera.y - 0.1f, -5.9f);
                     break;
                 case  GLFW_KEY_UP:
-                    camera.y += 0.99f;
+                    camera.y += 0.1f;
                     break;
                 case GLFW_KEY_LEFT:
-                    camera.x -= 0.99f;
+                    camera.x -= 0.1f;
                     break;
                 case  GLFW_KEY_RIGHT:
-                    camera.x += 0.99f;
+                    camera.x += 0.1f;
                     break;
                 case GLFW_KEY_S:
-                    camera.z -= 0.99f;
+                    camera.z -= 0.1f;
                     break;
                 case GLFW_KEY_W:
-                    camera.z += 0.3f ;
+                    camera.z += 0.1f ;
                     break;
                 case GLFW_KEY_F1:
                     lightswitch[0] = !lightswitch[0];
                     break;
                 case GLFW_KEY_F2:
                     lightswitch[1] = !lightswitch[1];
+                    break;
+                case GLFW_KEY_F3:
+                    lightswitch[2] = !lightswitch[2];
                     break;
                 case GLFW_KEY_KP_4:
                     forward = forward.rotateY(0.05f);

@@ -3,7 +3,6 @@
 layout(local_size_x = 32, local_size_y = 32) in;
 layout(rgba32f, binding = 0) uniform image2D img_output;
 layout(location = 0) uniform vec3 camera;
-
 layout(location = 1) uniform mat3 transform;
 
 uniform struct {
@@ -15,7 +14,7 @@ uniform struct {
 uniform struct {
     bool toggle;
     vec3 location;
-} lights[2];
+} lights[3];
 
 vec3 planepoint = vec3(0.0, -6.0, 0.0);
 vec3 planenormal = vec3(0.0, 1.0, 0.0);
@@ -68,20 +67,23 @@ vec4 shadowBounce(vec3 origin, vec3 light_source) {
     return vec4(1.0, 1.0, 1.0, 1.0);
 }
 
-vec4 trace() {
-    vec4 color = vec4(0.0, 0.0, 0.0, 1.0); // Base color
-
+vec3 getRay() {
     // Get (x,y) position of this pixel in the texture (index in global work group)
     pixel_coords = ivec2(gl_GlobalInvocationID.xy);
     ivec2 dimensions = imageSize(img_output);
 
-    // Map pixel coordinates to normalized space: [-1,1]^2
-    float x = (float(pixel_coords.x * 2 - dimensions.x) * 16 / (dimensions.x * 9));
-    float y = (float(pixel_coords.y * 2 - dimensions.y) / dimensions.y);
+    // Map pixel coordinates to normalized space: [-1,1]^2 (sorta, taking care of aspect ratio)
+    float x = (float(pixel_coords.x * 2.0 - dimensions.x) * 16.0 / (dimensions.x * 9.0)) + camera.x;
+    float y = (float(pixel_coords.y * 2.0 - dimensions.y) / dimensions.y) + camera.y;
+    float z = camera.z + 1.2;
+    return normalize(vec3(x, y, z) - camera) * transform;
+}
 
-    vec3 direction = normalize((vec3(x, y, 1.0) * transform));
+vec4 trace() {
+    vec4 color = vec4(0.0, 0.0, 0.0, 1.0); // Base color
+
+    vec3 direction = getRay();
     float smallest = 1.0 / 0; // infinity (?)
-
     vec3 sphere_center;
     float sphere_radius;
     for (int i = 0; i < spheres.length(); i++) {
@@ -99,7 +101,7 @@ vec4 trace() {
             vec3 intersection = distance * direction + camera;
             vec3 sphere_normal = (intersection - sphere_center) / sphere_radius;
             color = vec4(0.0, 0.0, 0.0, 1.0);
-            for (int j = 0; j < 2; j ++) { // Treat the last two spheres as light sources
+            for (int j = 0; j < lights.length(); j ++) { // Treat the last two spheres as light sources
                 if (lights[j].toggle)
                 color += phong(intersection, sphere_normal, lights[j].location, vec4(spheres[i].color, 1.0)) * shadowBounce(intersection + 0.0001 * sphere_normal, lights[j].location);
             }
@@ -112,7 +114,7 @@ vec4 trace() {
     vec3 intersection = d * direction + camera;
 
     if (d >= 0.0  && d <= smallest) {
-        for (int j = 0; j < 2; j ++) { // Treat the last two spheres as light sources
+        for (int j = 0; j < lights.length(); j ++) { // Treat the last two spheres as light sources
             if (lights[j].toggle)
             color += phong(intersection, planenormal, lights[j].location, vec4(0.4, 0.4, 0.4, 1.0)) * shadowBounce(intersection + 0.0001 * planenormal, lights[j].location);
         }
