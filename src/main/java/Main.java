@@ -196,15 +196,15 @@ public class Main {
 
     private void moveSpheres(double time) {
         for (Sphere sphere : scene) {
-            sphere.center.x = (float) (sphere.shininess * Math.sin(time) * 0.005f + sphere.center.x);
-            sphere.center.z = (float) (sphere.shininess * Math.cos(time) * 0.005f + sphere.center.z);
+            sphere.center.x = (float) (sphere.shininess * Math.sin(time + sphere.shininess) * 0.005f + sphere.center.x);
+            sphere.center.z = (float) (sphere.shininess * Math.cos(time + sphere.shininess) * 0.005f + sphere.center.z);
         }
     }
 
     private void moveLights(double time) {
         for (int i = 0; i < lights.length/3; i++) {
-            lights[i * 3] += (float) ((Math.sin(time) * 0.2f));
-            lights[(i * 3) + 2] += (float) ((Math.cos(time) * 0.2f));
+            lights[i * 3] += (float) ((-Math.sin(time * (i + 1)) * 0.2f));
+            lights[(i * 3) + 2] += (float) ((-Math.cos(time * (i + 1)) * 0.2f));
         }
     }
 
