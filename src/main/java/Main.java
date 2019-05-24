@@ -70,12 +70,13 @@ public class Main {
     private Sphere[] scene = generateSpheres();
 
     private float[] lights = {
-            -10f,  7f, 0f,
-             10f,  7f, 0f,
-              0f,  7f, 20f
+            -10f,  10f, 0f,
+             10f,  10f, 0f,
+              0f,  10f, 20f
     };
 
     private boolean[] lightswitch = {true, true, true}; // Toggle light activity
+    private boolean moving_spheres, move_lights = false;
 
     private Vector3f camera = new Vector3f(0f, 0f, -2f);
     private float fov = 1.2f; // Camera to viewport distance. smaller fov => wider viewangle
@@ -152,6 +153,10 @@ public class Main {
         int frames = 0;
         while (!glfwWindowShouldClose(window)) {
             current_time = glfwGetTime();
+            if (moving_spheres)
+                moveSpheres(current_time);
+            if (move_lights)
+                moveLights(current_time);
             frames++;
 
             if (current_time - last_time > 1.0) { // Print average framerate every 5 seconds
@@ -187,6 +192,20 @@ public class Main {
         }
 
         return spheres;
+    }
+
+    private void moveSpheres(double time) {
+        for (Sphere sphere : scene) {
+            sphere.center.x = (float) (sphere.shininess * Math.sin(time) * 0.005f + sphere.center.x);
+            sphere.center.z = (float) (sphere.shininess * Math.cos(time) * 0.005f + sphere.center.z);
+        }
+    }
+
+    private void moveLights(double time) {
+        for (int i = 0; i < lights.length/3; i++) {
+            lights[i * 3] += (float) ((Math.sin(time) * 0.2f));
+            lights[(i * 3) + 2] += (float) ((Math.cos(time) * 0.2f));
+        }
     }
 
     private void setupQuad() {
@@ -401,6 +420,14 @@ public class Main {
                     break;
                 case GLFW_KEY_F3:
                     lightswitch[2] = !lightswitch[2];
+                    toRemove.add(keyPressed);
+                    break;
+                case GLFW_KEY_M:
+                    moving_spheres = !moving_spheres;
+                    toRemove.add(keyPressed);
+                    break;
+                case GLFW_KEY_L:
+                    move_lights = !move_lights;
                     toRemove.add(keyPressed);
                     break;
                 case GLFW_KEY_KP_4:
