@@ -38,6 +38,7 @@ vec3 getRay() {
 vec4 trace() {
     vec4 color = vec4(0.0, 0.0, 0.0, 1.0);
     vec3 ray = getRay();
+    ray.z = -ray.z; // Really hacky and should not be the case, but i don't really know how to fix it otherwise for now.
 
     float tringle_area, ray_tringle_angle, d, t, u, v; // u and v can be used for interpolating
     vec3 C, P; // P is the intersection point of the ray and the tringle, C is used to check if the intersection is inside
@@ -61,7 +62,7 @@ vec4 trace() {
         //tringle_area = length(tringle_normal) / 2.0; // Doesn't per say have to be divided by 2
         d = dot(tringle_normal, tringles[i].vertices[0]);
         t = (dot(tringle_normal, camera) + d) / ray_tringle_angle;
-        if (t < 0.0 || t > closest) { // Tringle is behind the camera or not the closest tringle, so skip it
+        if (t < 0.0 || t >= closest) { // Tringle is behind the camera or not the closest tringle, so skip it
             continue;
         }
 
