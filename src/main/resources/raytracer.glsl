@@ -18,6 +18,7 @@ uniform struct {
     vec3 location;
 } lights[3];
 
+
 vec3 planepoint = vec3(0.0, -6.0, 0.0);
 vec3 planenormal = vec3(0.0, 1.0, 0.0);
 ivec2 pixel_coords;

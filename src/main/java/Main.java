@@ -19,9 +19,7 @@ import static org.lwjgl.opengl.GL12.GL_CLAMP_TO_EDGE;
 import static org.lwjgl.opengl.GL20C.*;
 import static org.lwjgl.opengl.GL42C.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT;
 import static org.lwjgl.opengl.GL42C.glMemoryBarrier;
-import static org.lwjgl.opengl.GL43C.GL_COMPUTE_SHADER;
-import static org.lwjgl.opengl.GL43C.GL_COMPUTE_WORK_GROUP_SIZE;
-import static org.lwjgl.opengl.GL43C.glDispatchCompute;
+import static org.lwjgl.opengl.GL43C.*;
 import static org.lwjgl.system.MemoryUtil.NULL;
 
 public class Main {
@@ -32,6 +30,7 @@ public class Main {
     private double last_time, current_time, delta;
 
     private int vaoId, VertexVBO, IndexVBO, ColorVBO; // VAO and VBO's
+    private int vertexSSBO, normalSSBO; // Shader buffer objects for passing triangle data
     private int quadProgram, rayProgram; // Shader programs
     private int rayTexture; // Image for the raytracing
     private int cameraSSBO;
@@ -55,11 +54,11 @@ public class Main {
             1f, 1f, 1f, 1f,
     };
 
-    Triangle trig = new Triangle(
+    private Triangle trig = new Triangle(
             new Vector3f[] {
-                new Vector3f(0f, 0.5f, 0f),
-                new Vector3f(-0.5f, -0.5f, 0f),
-                new Vector3f(0.5f, 0.5f, 0f)
+                new Vector3f(0f, 0f, 0f),
+                new Vector3f(0f, 1f, 0f),
+                new Vector3f(1f, 0f, 0f)
             }, new Vector3f[] {
                     new Vector3f(0f, 0f, -1f),
                     new Vector3f(0f, 0f, -1f),
@@ -147,6 +146,7 @@ public class Main {
         setupQuad();
         createQuadProgram();
         setupTexture();
+        setupTriangle();
         createRayProgram();
 
         last_time = glfwGetTime();
@@ -208,6 +208,19 @@ public class Main {
         }
     }
 
+    private void setupTriangle() {
+        FloatBuffer vertex_data = createBuffer(trig.getData(Triangle.data_type.VERTEX));
+        FloatBuffer normal_data = createBuffer(trig.getData(Triangle.data_type.NORMAL));
+
+        vertexSSBO = GL43.glGenBuffers();
+        GL43.glBindBuffer(GL43.GL_ARRAY_BUFFER, vertexSSBO);
+        GL43.glBufferData(GL43.GL_ARRAY_BUFFER, vertex_data, GL43.GL_STATIC_DRAW);
+
+        normalSSBO = GL43.glGenBuffers();
+        GL43.glBindBuffer(GL43.GL_ARRAY_BUFFER, normalSSBO);
+        GL43.glBufferData(GL43.GL_ARRAY_BUFFER, normal_data, GL43.GL_STATIC_DRAW);
+    }
+
     private void setupQuad() {
         vaoId = GL30.glGenVertexArrays();
         GL30.glBindVertexArray(vaoId);
@@ -266,7 +279,7 @@ public class Main {
     }
 
     private void createRayProgram() {
-        int ray_shader = loadShader("src/main/resources/raytracer.glsl", GL_COMPUTE_SHADER);
+        int ray_shader = loadShader("src/main/resources/triangleTracer.glsl", GL_COMPUTE_SHADER);
         System.out.println("[RayTracerShader]: " + GL43.glGetShaderInfoLog(ray_shader));
 
         rayProgram = glCreateProgram();
@@ -287,6 +300,12 @@ public class Main {
     }
 
     private void executeRay() {
+        int[] work_group_size = new int[3];
+        GL20.glGetProgramiv(rayProgram, GL_COMPUTE_WORK_GROUP_SIZE, work_group_size);
+
+        int work_x = getNextPowerOfTwo(width  / work_group_size[0]);
+        int work_y = getNextPowerOfTwo(height / work_group_size[1]);
+
         GL41.glProgramUniform3f(rayProgram, 0, camera.x, camera.y, camera.z);
         GL41.glProgramUniform1f(rayProgram, 1, fov);
         GL41.glProgramUniformMatrix3fv(rayProgram, 2, false, new float[] {
@@ -294,7 +313,18 @@ public class Main {
                 up.x, up.y, up.z,
                 forward.x, forward.y, forward.z
         });
+        GL43.glProgramUniform1i(rayProgram, 3, trig.vertices.length/3);
 
+        glUseProgram(rayProgram);
+
+        GL43.glBindBufferBase(GL43.GL_SHADER_STORAGE_BUFFER, 1, vertexSSBO);
+        GL43.glBindBufferBase(GL43.GL_SHADER_STORAGE_BUFFER, 2, normalSSBO);
+
+        glDispatchCompute(work_x, work_y, 1);
+        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+    }
+
+    private void setupExecRay() {
         for (int i = 0; i < scene.length; i++) {
             Sphere sphere = scene[i];
             GL41.glProgramUniform3f(rayProgram, GL41.glGetUniformLocation(rayProgram, String.format("spheres[%d].location", i)), sphere.center.x, sphere.center.y, sphere.center.z);
@@ -307,17 +337,6 @@ public class Main {
             GL41.glProgramUniform3f(rayProgram, GL41.glGetUniformLocation(rayProgram, String.format("lights[%d].location", i)), lights[(3 * i)], lights[(3 * i) + 1], lights[(3 * i) + 2]);
             GL41.glProgramUniform1i(rayProgram, GL41.glGetUniformLocation(rayProgram, String.format("lights[%d].toggle", i)), lightswitch[i] ? 1 : 0);
         }
-
-        int[] work_group_size = new int[3];
-        GL20.glGetProgramiv(rayProgram, GL_COMPUTE_WORK_GROUP_SIZE, work_group_size);
-
-        int work_x = getNextPowerOfTwo(width  / work_group_size[0]);
-        int work_y = getNextPowerOfTwo(height / work_group_size[1]);
-
-        glUseProgram(rayProgram);
-        glDispatchCompute(work_x, work_y, 1);
-        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-        //System.out.println(glGetProgramInfoLog(rayProgram));
     }
 
     private void renderQuad() {
@@ -455,6 +474,9 @@ public class Main {
                     break;
                 case GLFW_KEY_MINUS:
                     fov = Math.max(fov - 0.02f, 0.2f);
+                    break;
+                case GLFW_KEY_D:
+                    System.out.println("Camera:" + camera + ", Forward:" + forward.toString());
                     break;
             }
         }
