@@ -21,7 +21,7 @@ import static org.lwjgl.opengl.GL43C.*;
 import static org.lwjgl.system.MemoryUtil.NULL;
 
 public class Main {
-    private static final int VSYNCH = 0;
+    private static final int VSYNCH = 1;
 
     private long window; // The window handle
     private int width = 1280;
@@ -56,7 +56,7 @@ public class Main {
             1f, 1f, 1f, 1f,
     };
 
-    private static final int tringle_amount = 1;
+    private static final int tringle_amount = 10;
     private Triangle[] tringles = generateTringles();
 
     private Sphere[] scene = generateSpheres();
@@ -136,7 +136,7 @@ public class Main {
         GL11.glClearColor(0.4f, 0.3f, 0.9f, 0f);
         GL11.glEnable(GL11.GL_DEPTH_TEST);
 
-        (new Timer()).schedule((new InputHandler()), 0, 1);
+        (new Timer()).schedule((new InputHandler()), 0, 15);
 
         setupQuad();
         createQuadProgram();
@@ -194,7 +194,18 @@ public class Main {
         Triangle[] result = new Triangle[tringle_amount];
         Random generator = new Random();
 
-        for (int i = 0; i < tringle_amount; i++) {
+        result[0] = new Triangle( // First triangle will always be the same
+                new Vector3f[] {
+                        new Vector3f(0f, 0f, 0f),
+                        new Vector3f(0f, 1f, 0f),
+                        new Vector3f(1f, 0f, 0f)
+                }, new Vector3f[] {
+                new Vector3f(0f, 0f, -1f),
+                new Vector3f(0f, 0f, -1f),
+                new Vector3f(0f, 0f, -1f)
+        });
+
+        for (int i = 1; i < tringle_amount; i++) {
             Vector3f start = new Vector3f(
                     (generator.nextFloat() - 0.5f) * 10f,
                     (generator.nextFloat() - 0.5f) * 10f,
@@ -242,7 +253,7 @@ public class Main {
         }
     }
 
-    private void setupTriangle() {
+    private void setupTriangle() { // TODO: fix this
         float[] vertex_data_raw = new float[tringles.length * 12];
         float[] normal_data_raw = new float[tringles.length * 12];
 
@@ -250,7 +261,7 @@ public class Main {
             for (int j = 0; j < tringles[i].getData(Triangle.data_type.VERTEX).length; j++) {
                 vertex_data_raw[(i * 12) + j] = tringles[i].getData(Triangle.data_type.VERTEX)[j];
             }
-            for (int j = 0; j < tringles[i].getData(Triangle.data_type.NORMAL).length; j++) {
+            for (int j = 0; j < tringles[i].getData(Triangle.data_type.VERTEX).length; j++) {
                 normal_data_raw[(i * 12) + j] = tringles[i].getData(Triangle.data_type.NORMAL)[j];
             }
         }
@@ -354,7 +365,7 @@ public class Main {
 
         GL41.glProgramUniform3f(rayProgram, 0, camera.x, camera.y, camera.z);
         GL41.glProgramUniform1f(rayProgram, 1, fov);
-        GL41.glProgramUniformMatrix3fv(rayProgram, 2, false, new float[] {
+        GL41.glProgramUniformMatrix3fv(rayProgram, 2, true, new float[] {
                 right.x, right.y, right.z,
                 up.x, up.y, up.z,
                 forward.x, forward.y, forward.z
@@ -440,8 +451,6 @@ public class Main {
         } else if (action == GLFW_RELEASE) {
             pressedKeys.remove(key);
         }
-
-        //handleKeys(pressedKeys);
     }
 
     private void windowSizeCallback(long window, int width, int height) {
@@ -497,13 +506,15 @@ public class Main {
     }
 
     private class InputHandler extends TimerTask {
+        private Set<Integer> toRemove = new HashSet<>();
+
         @Override
         public void run() {
             handleKeys();
         }
 
-        private void handleKeys() {
-            Set<Integer> toRemove = new HashSet<>();
+        private synchronized void handleKeys() {
+            toRemove.clear();
 
             for (int keyPressed : pressedKeys) {
                 switch (keyPressed) {
@@ -516,22 +527,22 @@ public class Main {
                         toRemove.add(keyPressed);
                         break;
                     case GLFW_KEY_DOWN:
-                        camera.y = Math.max(camera.y - 0.05f, -5.9f);
+                        camera.add(up.mul(-0.05f, new Vector3f()));
                         break;
                     case  GLFW_KEY_UP:
-                        camera.y += 0.05f;
+                        camera.add(up.mul(0.05f, new Vector3f()));
                         break;
                     case GLFW_KEY_LEFT:
-                        camera.x -= 0.05f;
+                        camera.add(right.mul(-0.05f, new Vector3f()));
                         break;
                     case  GLFW_KEY_RIGHT:
-                        camera.x += 0.05f;
+                        camera.add(right.mul(0.05f, new Vector3f()));
                         break;
                     case GLFW_KEY_S:
-                        camera.z -= 0.05f;
+                        camera.add(forward.mul(-0.05f, new Vector3f()));
                         break;
                     case GLFW_KEY_W:
-                        camera.z += 0.05f ;
+                        camera.add(forward.mul(0.05f, new Vector3f()));
                         break;
                     case GLFW_KEY_F1:
                         lightswitch[0] = !lightswitch[0];
@@ -554,24 +565,24 @@ public class Main {
                         toRemove.add(keyPressed);
                         break;
                     case GLFW_KEY_KP_4:
-                        forward = forward.rotateY(0.01f);
-                        up =      up.rotateY(0.01f);
-                        right =   right.rotateY(0.01f);
+                        forward = forward.rotateAxis(-0.01f, up.x, up.y, up.z);
+                        up =      up.     rotateAxis(-0.01f, up.x, up.y, up.z);
+                        right =   right.  rotateAxis(-0.01f, up.x, up.y, up.z);
                         break;
                     case GLFW_KEY_KP_6:
-                        forward = forward.rotateY(-0.01f);
-                        up =      up.rotateY(-0.01f);
-                        right =   right.rotateY(-0.01f);
+                        forward = forward.rotateAxis(0.01f, up.x, up.y, up.z);
+                        up =      up.     rotateAxis(0.01f, up.x, up.y, up.z);
+                        right =   right.  rotateAxis(0.01f, up.x, up.y, up.z);
                         break;
                     case GLFW_KEY_KP_8:
-                        forward = forward.rotateX(0.01f);
-                        up =      up.rotateX(0.01f);
-                        right =   right.rotateX(0.01f);
+                        forward = forward.rotateAxis(-0.01f, right.x, right.y, right.z);
+                        up =      up.     rotateAxis(-0.01f, right.x, right.y, right.z);
+                        right =   right.  rotateAxis(-0.01f, right.x, right.y, right.z);
                         break;
                     case GLFW_KEY_KP_2:
-                        forward = forward.rotateX(-0.01f);
-                        up =      up.rotateX(-0.01f);
-                        right =   right.rotateX(-0.01f);
+                        forward = forward.rotateAxis(0.01f, right.x, right.y, right.z);
+                        up =      up.     rotateAxis(0.01f, right.x, right.y, right.z);
+                        right =   right.  rotateAxis(0.01f, right.x, right.y, right.z);
                         break;
                     case GLFW_KEY_EQUAL:
                         fov += 0.02;
@@ -595,9 +606,7 @@ public class Main {
                 }
             }
 
-            for (Integer key : toRemove) {
-                pressedKeys.remove(key);
-            }
+            pressedKeys.removeAll(toRemove);
         }
 
     }

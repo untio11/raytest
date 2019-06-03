@@ -16,13 +16,6 @@ layout(std430, binding = 2) buffer VertexNormals {
     vec4 parsed_normals[];
 };
 
-struct Triangle {
-    vec3 vertices[3];
-    vec3 normals[3];
-};
-
-Triangle tringles[10];
-
 ivec2 pixel_coords;
 vec4 end_color;
 
@@ -38,7 +31,6 @@ vec3 getRay() {
 vec4 trace() {
     vec4 color = vec4(0.0, 0.0, 0.0, 1.0);
     vec3 ray = getRay();
-    ray.z = -ray.z; // Really hacky and should not be the case, but i don't really know how to fix it otherwise for now.
 
     float tringle_area, ray_tringle_angle, d, t, u, v; // u and v can be used for interpolating
     vec3 C, P; // P is the intersection point of the ray and the tringle, C is used to check if the intersection is inside
@@ -47,7 +39,7 @@ vec4 trace() {
 
     float closest = 1.0 / 0.0;
 
-    //color = vec4(ray, 1.0);
+    color = vec4(ray, 1.0);
 
     for (int i = 0; i < tringle_amount; i++) {
         tringle_normal = cross(parsed_positions[(i * 3) + 1].xyz - parsed_positions[(i * 3) + 0].xyz,
@@ -60,9 +52,9 @@ vec4 trace() {
         }
 
         //tringle_area = length(tringle_normal) / 2.0; // Doesn't per say have to be divided by 2
-        d = dot(tringle_normal, parsed_positions[(i * 3) + 0].xyz);
-        t = (dot(tringle_normal, camera) + d) / ray_tringle_angle;
-        if (t < 0.0 || t >= closest) { // Tringle is behind the camera or not the closest tringle, so skip it
+        d = dot(tringle_normal, parsed_positions[(i * 3) + 0].xyz); // Distance from origin to first vertex
+        t = - (dot(tringle_normal, camera) + d) / ray_tringle_angle;
+        if (t < 0.0) { // Tringle is behind the camera or not the closest tringle, so skip it
             continue;
         }
 

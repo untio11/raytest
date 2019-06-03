@@ -32,7 +32,7 @@ public class Triangle {
         Vector4f[] list = type.equals(data_type.NORMAL) ? normals : vertices;
 
         for (Vector4f vertex : list) {
-            for (int i = 0; i < 3; i++) {
+            for (int i = 0; i < 4; i++) {
                 result.add(vertex.get(i));
             }
         }
@@ -52,11 +52,11 @@ public class Triangle {
         Vector4f[] list2 = normals;
 
         for (int i = 0; i < list1.length; i++) {
-            for (int j = 0; j < 3; j++) {
+            for (int j = 0; j < 4; j++) {
                 result.add(list1[i].get(j));
             }
 
-            for (int j = 0; j < 3; j++) {
+            for (int j = 0; j < 4; j++) {
                 result.add(list2[i].get(j));
             }
         }
