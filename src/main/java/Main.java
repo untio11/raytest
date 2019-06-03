@@ -37,14 +37,14 @@ public class Main {
     private int rayTexture; // Image for the raytracing
     private int cameraSSBO;
 
-    float[] vertices = {
+    private static float[] vertices = {
             -1f,  1f, 0f, 1f, // 1/6 -> ID:0
             -1f, -1f, 0f, 1f, // 2   -> ID:1
              1f, -1f, 0f, 1f, // 3/4 -> ID:2
              1f,  1f, 0f, 1f, // 5   -> ID:3
     };
 
-    byte[] indices = {
+    private static byte[] indices = {
             0, 1, 2,
             2, 3, 0
     };
@@ -71,10 +71,10 @@ public class Main {
     private boolean moving_spheres, move_lights = false;
 
     private Vector3f camera = new Vector3f(0f, 0f, -2f);
-    private float fov = 1.2f; // Camera to viewport distance. smaller fov => wider viewangle
-    private Vector3f forward = new Vector3f(0f, 0f, 1f);
-    private Vector3f up = new Vector3f(0f, 1f, 0f);
-    private Vector3f right = new Vector3f(1f, 0f, 0f);
+    private static float fov = 1.2f; // Camera to viewport distance. smaller fov => wider viewangle
+    private static Vector3f forward = new Vector3f(0f, 0f, 1f);
+    private static Vector3f up = new Vector3f(0f, 1f, 0f);
+    private static Vector3f right = new Vector3f(1f, 0f, 0f);
 
 
     private Set<Integer> pressedKeys = new HashSet<>(); // To collect all pressed keys for processing
