@@ -9,9 +9,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
-import java.util.HashSet;
-import java.util.Random;
-import java.util.Set;
+import java.util.*;
 
 import static org.lwjgl.glfw.Callbacks.glfwFreeCallbacks;
 import static org.lwjgl.glfw.GLFW.*;
@@ -23,11 +21,15 @@ import static org.lwjgl.opengl.GL43C.*;
 import static org.lwjgl.system.MemoryUtil.NULL;
 
 public class Main {
+    private static final int VSYNCH = 0;
+
     private long window; // The window handle
     private int width = 1280;
     private int height = 720;
     private double movement_param = 0d;
     private double last_time, current_time, delta;
+    private boolean showfps = true;
+    private boolean updated = false;
 
     private int vaoId, VertexVBO, IndexVBO, ColorVBO; // VAO and VBO's
     private int vertexSSBO, normalSSBO; // Shader buffer objects for passing triangle data
@@ -54,17 +56,8 @@ public class Main {
             1f, 1f, 1f, 1f,
     };
 
-    private Triangle trig = new Triangle(
-            new Vector3f[] {
-                new Vector3f(0f, 0f, 0f),
-                new Vector3f(0f, 1f, 0f),
-                new Vector3f(1f, 0f, 0f)
-            }, new Vector3f[] {
-                    new Vector3f(0f, 0f, -1f),
-                    new Vector3f(0f, 0f, -1f),
-                    new Vector3f(0f, 0f, -1f)
-            }
-    );
+    private static final int tringle_amount = 1;
+    private Triangle[] tringles = generateTringles();
 
     private Sphere[] scene = generateSpheres();
 
@@ -133,7 +126,7 @@ public class Main {
         // Make the OpenGL context current
         glfwMakeContextCurrent(window);
         // Enable v-sync
-        glfwSwapInterval(1);
+        glfwSwapInterval(VSYNCH);
 
         System.out.println("Compute shader " + glfwExtensionSupported("ARB_compute_shader"));
     }
@@ -143,6 +136,8 @@ public class Main {
         GL11.glClearColor(0.4f, 0.3f, 0.9f, 0f);
         GL11.glEnable(GL11.GL_DEPTH_TEST);
 
+        (new Timer()).schedule((new InputHandler()), 0, 1);
+
         setupQuad();
         createQuadProgram();
         setupTexture();
@@ -151,6 +146,7 @@ public class Main {
 
         last_time = glfwGetTime();
         int frames = 0;
+
         while (!glfwWindowShouldClose(window)) {
             current_time = glfwGetTime();
             if (moving_spheres)
@@ -160,13 +156,13 @@ public class Main {
             frames++;
 
             if (current_time - last_time > 1.0) { // Print average framerate every 5 seconds
-                System.out.println(String.format("%f ms/frame <=> %f frames/s", 1000d/((double) frames), (double)frames / 1d));
+                if (showfps) System.out.println(String.format("%f ms/frame <=> %f frames/s", 1000d/((double) frames), (double)frames / 1d));
                 frames = 0;
                 last_time = glfwGetTime();
             }
+
             render();
             glfwPollEvents();
-            handleKeys(pressedKeys);
         }
     }
 
@@ -194,6 +190,44 @@ public class Main {
         return spheres;
     }
 
+    private Triangle[] generateTringles() {
+        Triangle[] result = new Triangle[tringle_amount];
+        Random generator = new Random();
+
+        for (int i = 0; i < tringle_amount; i++) {
+            Vector3f start = new Vector3f(
+                    (generator.nextFloat() - 0.5f) * 10f,
+                    (generator.nextFloat() - 0.5f) * 10f,
+                    (generator.nextFloat() - 0.5f) * 7f + 3f
+            );
+
+            Vector3f vertex1 = new Vector3f(
+                    start.x + (generator.nextFloat() - 0.5f) *  2f,
+                    start.y + (generator.nextFloat() - 0.5f) *  2f,
+                    start.z + (generator.nextFloat() - 0.5f) *  2f
+            );
+
+            Vector3f vertex2 = new Vector3f(
+                    start.x + (generator.nextFloat() - 0.5f) *  2f,
+                    start.y + (generator.nextFloat() - 0.5f) *  2f,
+                    start.z + (generator.nextFloat() - 0.5f) *  2f
+            );
+
+            result[i] = new Triangle(
+                    new Vector3f[] {
+                            start,
+                            vertex1,
+                            vertex2
+                    }, new Vector3f[] {
+                    new Vector3f(0f, 0f, -1f),
+                    new Vector3f(0f, 0f, -1f),
+                    new Vector3f(0f, 0f, -1f)
+            });
+        }
+        updated = true;
+        return result;
+    }
+
     private void moveSpheres(double time) {
         for (Sphere sphere : scene) {
             sphere.center.x = (float) (sphere.shininess * Math.sin(time + sphere.shininess) * 0.005f + sphere.center.x);
@@ -209,8 +243,20 @@ public class Main {
     }
 
     private void setupTriangle() {
-        FloatBuffer vertex_data = createBuffer(trig.getData(Triangle.data_type.VERTEX));
-        FloatBuffer normal_data = createBuffer(trig.getData(Triangle.data_type.NORMAL));
+        float[] vertex_data_raw = new float[tringles.length * 12];
+        float[] normal_data_raw = new float[tringles.length * 12];
+
+        for (int i = 0; i < tringles.length; i++) {
+            for (int j = 0; j < tringles[i].getData(Triangle.data_type.VERTEX).length; j++) {
+                vertex_data_raw[(i * 12) + j] = tringles[i].getData(Triangle.data_type.VERTEX)[j];
+            }
+            for (int j = 0; j < tringles[i].getData(Triangle.data_type.NORMAL).length; j++) {
+                normal_data_raw[(i * 12) + j] = tringles[i].getData(Triangle.data_type.NORMAL)[j];
+            }
+        }
+
+        FloatBuffer vertex_data = createBuffer(vertex_data_raw);
+        FloatBuffer normal_data = createBuffer(normal_data_raw);
 
         vertexSSBO = GL43.glGenBuffers();
         GL43.glBindBuffer(GL43.GL_ARRAY_BUFFER, vertexSSBO);
@@ -313,9 +359,15 @@ public class Main {
                 up.x, up.y, up.z,
                 forward.x, forward.y, forward.z
         });
-        GL43.glProgramUniform1i(rayProgram, 3, trig.vertices.length/3);
+
+        GL43.glProgramUniform1i(rayProgram, 3, tringle_amount);
 
         glUseProgram(rayProgram);
+
+        if (updated) {
+            setupTriangle();
+            updated = false;
+        }
 
         GL43.glBindBufferBase(GL43.GL_SHADER_STORAGE_BUFFER, 1, vertexSSBO);
         GL43.glBindBufferBase(GL43.GL_SHADER_STORAGE_BUFFER, 2, normalSSBO);
@@ -399,93 +451,6 @@ public class Main {
         setupTexture();
     }
 
-    private void handleKeys(Set<Integer> pressedKeys) {
-        Set<Integer> toRemove = new HashSet<>();
-
-        for (int keyPressed : pressedKeys) {
-            switch (keyPressed) {
-                case GLFW_KEY_ESCAPE:
-                    glfwSetWindowShouldClose(window, true);
-                    break;
-                case GLFW_KEY_F5:
-                    scene = generateSpheres();
-                    toRemove.add(keyPressed);
-                    break;
-                case GLFW_KEY_DOWN:
-                    camera.y = Math.max(camera.y - 0.05f, -5.9f);
-                    break;
-                case  GLFW_KEY_UP:
-                    camera.y += 0.05f;
-                    break;
-                case GLFW_KEY_LEFT:
-                    camera.x -= 0.05f;
-                    break;
-                case  GLFW_KEY_RIGHT:
-                    camera.x += 0.05f;
-                    break;
-                case GLFW_KEY_S:
-                    camera.z -= 0.05f;
-                    break;
-                case GLFW_KEY_W:
-                    camera.z += 0.05f ;
-                    break;
-                case GLFW_KEY_F1:
-                    lightswitch[0] = !lightswitch[0];
-                    toRemove.add(keyPressed);
-                    break;
-                case GLFW_KEY_F2:
-                    lightswitch[1] = !lightswitch[1];
-                    toRemove.add(keyPressed);
-                    break;
-                case GLFW_KEY_F3:
-                    lightswitch[2] = !lightswitch[2];
-                    toRemove.add(keyPressed);
-                    break;
-                case GLFW_KEY_M:
-                    moving_spheres = !moving_spheres;
-                    toRemove.add(keyPressed);
-                    break;
-                case GLFW_KEY_L:
-                    move_lights = !move_lights;
-                    toRemove.add(keyPressed);
-                    break;
-                case GLFW_KEY_KP_4:
-                    forward = forward.rotateY(0.01f);
-                    up =      up.rotateY(0.01f);
-                    right =   right.rotateY(0.01f);
-                    break;
-                case GLFW_KEY_KP_6:
-                    forward = forward.rotateY(-0.01f);
-                    up =      up.rotateY(-0.01f);
-                    right =   right.rotateY(-0.01f);
-                    break;
-                case GLFW_KEY_KP_8:
-                    forward = forward.rotateX(0.01f);
-                    up =      up.rotateX(0.01f);
-                    right =   right.rotateX(0.01f);
-                    break;
-                case GLFW_KEY_KP_2:
-                    forward = forward.rotateX(-0.01f);
-                    up =      up.rotateX(-0.01f);
-                    right =   right.rotateX(-0.01f);
-                    break;
-                case GLFW_KEY_EQUAL:
-                    fov += 0.02;
-                    break;
-                case GLFW_KEY_MINUS:
-                    fov = Math.max(fov - 0.02f, 0.2f);
-                    break;
-                case GLFW_KEY_D:
-                    System.out.println("Camera:" + camera + ", Forward:" + forward.toString());
-                    break;
-            }
-        }
-
-        for (Integer key : toRemove) {
-            pressedKeys.remove(key);
-        }
-    }
-
     private FloatBuffer createBuffer(float[] data) {
         FloatBuffer buffer = BufferUtils.createFloatBuffer(data.length);
         buffer.put(data);
@@ -529,5 +494,111 @@ public class Main {
         result |= result >> 2;
         result |= result >> 1;
         return result + 1;
+    }
+
+    private class InputHandler extends TimerTask {
+        @Override
+        public void run() {
+            handleKeys();
+        }
+
+        private void handleKeys() {
+            Set<Integer> toRemove = new HashSet<>();
+
+            for (int keyPressed : pressedKeys) {
+                switch (keyPressed) {
+                    case GLFW_KEY_ESCAPE:
+                        glfwSetWindowShouldClose(window, true);
+                        break;
+                    case GLFW_KEY_F5:
+                        scene = generateSpheres();
+                        tringles = generateTringles();
+                        toRemove.add(keyPressed);
+                        break;
+                    case GLFW_KEY_DOWN:
+                        camera.y = Math.max(camera.y - 0.05f, -5.9f);
+                        break;
+                    case  GLFW_KEY_UP:
+                        camera.y += 0.05f;
+                        break;
+                    case GLFW_KEY_LEFT:
+                        camera.x -= 0.05f;
+                        break;
+                    case  GLFW_KEY_RIGHT:
+                        camera.x += 0.05f;
+                        break;
+                    case GLFW_KEY_S:
+                        camera.z -= 0.05f;
+                        break;
+                    case GLFW_KEY_W:
+                        camera.z += 0.05f ;
+                        break;
+                    case GLFW_KEY_F1:
+                        lightswitch[0] = !lightswitch[0];
+                        toRemove.add(keyPressed);
+                        break;
+                    case GLFW_KEY_F2:
+                        lightswitch[1] = !lightswitch[1];
+                        toRemove.add(keyPressed);
+                        break;
+                    case GLFW_KEY_F3:
+                        lightswitch[2] = !lightswitch[2];
+                        toRemove.add(keyPressed);
+                        break;
+                    case GLFW_KEY_M:
+                        moving_spheres = !moving_spheres;
+                        toRemove.add(keyPressed);
+                        break;
+                    case GLFW_KEY_L:
+                        move_lights = !move_lights;
+                        toRemove.add(keyPressed);
+                        break;
+                    case GLFW_KEY_KP_4:
+                        forward = forward.rotateY(0.01f);
+                        up =      up.rotateY(0.01f);
+                        right =   right.rotateY(0.01f);
+                        break;
+                    case GLFW_KEY_KP_6:
+                        forward = forward.rotateY(-0.01f);
+                        up =      up.rotateY(-0.01f);
+                        right =   right.rotateY(-0.01f);
+                        break;
+                    case GLFW_KEY_KP_8:
+                        forward = forward.rotateX(0.01f);
+                        up =      up.rotateX(0.01f);
+                        right =   right.rotateX(0.01f);
+                        break;
+                    case GLFW_KEY_KP_2:
+                        forward = forward.rotateX(-0.01f);
+                        up =      up.rotateX(-0.01f);
+                        right =   right.rotateX(-0.01f);
+                        break;
+                    case GLFW_KEY_EQUAL:
+                        fov += 0.02;
+                        break;
+                    case GLFW_KEY_MINUS:
+                        fov = Math.max(fov - 0.02f, 0.2f);
+                        break;
+                    case GLFW_KEY_T:
+                        showfps = !showfps;
+                        toRemove.add(keyPressed);
+                        break;
+                    case GLFW_KEY_D:
+                        System.out.println("-----------Debug-----------");
+                        System.out.println("Camera: \t" + camera + ", Forward:" + forward.toString());
+                        for (Triangle triangle : tringles) {
+                            System.out.println("Triangles: \t" + triangle.toString());
+                        }
+                        System.out.println("---------------------------");
+                        toRemove.add(keyPressed);
+                        break;
+                }
+            }
+
+            for (Integer key : toRemove) {
+                pressedKeys.remove(key);
+            }
+        }
+
     }
 }
