@@ -127,7 +127,7 @@ vec4 trace() {
         }
     }
 
-    return color;
+    return pow(color, vec4(1.5));
 }
 
 

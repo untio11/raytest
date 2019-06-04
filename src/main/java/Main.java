@@ -21,15 +21,19 @@ import static org.lwjgl.opengl.GL43C.*;
 import static org.lwjgl.system.MemoryUtil.NULL;
 
 public class Main {
-    private static final int VSYNCH = 1;
+    private static final int VSYNCH = 0;
+    private static final float SUPERSAMPLING = 1.0f;
+    private static boolean SPHERES = false;
 
     private long window; // The window handle
     private int width = 1280;
     private int height = 720;
     private double movement_param = 0d;
     private double last_time, current_time, delta;
-    private boolean showfps = true;
+    private boolean showfps = false;
     private boolean updated = false;
+    private double avgframetime = 0f;
+    private long counter;
 
     private int vaoId, VertexVBO, IndexVBO, ColorVBO; // VAO and VBO's
     private int vertexSSBO, normalSSBO; // Shader buffer objects for passing triangle data
@@ -56,9 +60,8 @@ public class Main {
             1f, 1f, 1f, 1f,
     };
 
-    private static final int tringle_amount = 10;
+    private static final int tringle_amount = 42;
     private Triangle[] tringles = generateTringles();
-
     private Sphere[] scene = generateSpheres();
 
     private float[] lights = {
@@ -127,13 +130,10 @@ public class Main {
         glfwMakeContextCurrent(window);
         // Enable v-sync
         glfwSwapInterval(VSYNCH);
-
-        System.out.println("Compute shader " + glfwExtensionSupported("ARB_compute_shader"));
     }
 
     private void loop() {
         GL.createCapabilities();
-        GL11.glClearColor(0.4f, 0.3f, 0.9f, 0f);
         GL11.glEnable(GL11.GL_DEPTH_TEST);
 
         (new Timer()).schedule((new InputHandler()), 0, 15);
@@ -141,11 +141,17 @@ public class Main {
         setupQuad();
         createQuadProgram();
         setupTexture();
-        setupTriangle();
+
+        if (!SPHERES) {
+            setupTriangle();
+        }
+
         createRayProgram();
 
         last_time = glfwGetTime();
         int frames = 0;
+        counter = 0;
+        GL11.glClearColor(0.4f, 0.3f, 0.9f, 0f);
 
         while (!glfwWindowShouldClose(window)) {
             current_time = glfwGetTime();
@@ -157,6 +163,8 @@ public class Main {
 
             if (current_time - last_time > 1.0) { // Print average framerate every 5 seconds
                 if (showfps) System.out.println(String.format("%f ms/frame <=> %f frames/s", 1000d/((double) frames), (double)frames / 1d));
+                avgframetime += 1000d/((double) frames);
+                counter++;
                 frames = 0;
                 last_time = glfwGetTime();
             }
@@ -196,13 +204,13 @@ public class Main {
 
         result[0] = new Triangle( // First triangle will always be the same
                 new Vector3f[] {
-                        new Vector3f(0f, 0f, 0f),
-                        new Vector3f(0f, 1f, 0f),
-                        new Vector3f(1f, 0f, 0f)
+                        new Vector3f(-50f, -6f, -50f),
+                        new Vector3f(50f, -6f, -50f),
+                        new Vector3f(0f, -6f, 50f)
                 }, new Vector3f[] {
-                new Vector3f(0f, 0f, -1f),
-                new Vector3f(0f, 0f, -1f),
-                new Vector3f(0f, 0f, -1f)
+                new Vector3f(1f, 0f, 0f),
+                new Vector3f(0f, 1f, 0f),
+                new Vector3f(0f, 0f, 1f)
         });
 
         for (int i = 1; i < tringle_amount; i++) {
@@ -230,9 +238,9 @@ public class Main {
                             vertex1,
                             vertex2
                     }, new Vector3f[] {
-                    new Vector3f(0f, 0f, -1f),
-                    new Vector3f(0f, 0f, -1f),
-                    new Vector3f(0f, 0f, -1f)
+                    new Vector3f(generator.nextFloat(), generator.nextFloat(), generator.nextFloat()),
+                    new Vector3f(generator.nextFloat(), generator.nextFloat(), generator.nextFloat()),
+                    new Vector3f(generator.nextFloat(), generator.nextFloat(), generator.nextFloat())
             });
         }
         updated = true;
@@ -253,7 +261,7 @@ public class Main {
         }
     }
 
-    private void setupTriangle() { // TODO: fix this
+    private void setupTriangle() {
         float[] vertex_data_raw = new float[tringles.length * 12];
         float[] normal_data_raw = new float[tringles.length * 12];
 
@@ -331,12 +339,13 @@ public class Main {
         GL15.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         GL15.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         GL15.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        GL15.glTexImage2D(GL_TEXTURE_2D, 0, GL30C.GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
+        GL15.glTexImage2D(GL_TEXTURE_2D, 0, GL30C.GL_RGBA32F, (int)(width * SUPERSAMPLING), (int)(height * SUPERSAMPLING), 0, GL_RGBA, GL_FLOAT, NULL);
         GL43C.glBindImageTexture(0, rayTexture, 0, false, 0, GL15C.GL_WRITE_ONLY, GL30C.GL_RGBA32F);
     }
 
     private void createRayProgram() {
-        int ray_shader = loadShader("src/main/resources/triangleTracer.glsl", GL_COMPUTE_SHADER);
+        String shader = "src/main/resources/" + (SPHERES ? "raytracer" : "triangleTracer") + ".glsl";
+        int ray_shader = loadShader(shader, GL_COMPUTE_SHADER);
         System.out.println("[RayTracerShader]: " + GL43.glGetShaderInfoLog(ray_shader));
 
         rayProgram = glCreateProgram();
@@ -360,8 +369,8 @@ public class Main {
         int[] work_group_size = new int[3];
         GL20.glGetProgramiv(rayProgram, GL_COMPUTE_WORK_GROUP_SIZE, work_group_size);
 
-        int work_x = getNextPowerOfTwo(width  / work_group_size[0]);
-        int work_y = getNextPowerOfTwo(height / work_group_size[1]);
+        int work_x = getNextPowerOfTwo((int)(width * SUPERSAMPLING) / work_group_size[0]);
+        int work_y = getNextPowerOfTwo((int)(height * SUPERSAMPLING) / work_group_size[1]);
 
         GL41.glProgramUniform3f(rayProgram, 0, camera.x, camera.y, camera.z);
         GL41.glProgramUniform1f(rayProgram, 1, fov);
@@ -371,23 +380,24 @@ public class Main {
                 forward.x, forward.y, forward.z
         });
 
-        GL43.glProgramUniform1i(rayProgram, 3, tringle_amount);
-
-        glUseProgram(rayProgram);
-
-        if (updated) {
-            setupTriangle();
-            updated = false;
+        for (int i = 0; i < lights.length / 3; i++) {
+            GL41.glProgramUniform3f(rayProgram, GL41.glGetUniformLocation(rayProgram, String.format("lights[%d].location", i)), lights[(3 * i)], lights[(3 * i) + 1], lights[(3 * i) + 2]);
+            GL41.glProgramUniform1i(rayProgram, GL41.glGetUniformLocation(rayProgram, String.format("lights[%d].toggle", i)), lightswitch[i] ? 1 : 0);
         }
 
-        GL43.glBindBufferBase(GL43.GL_SHADER_STORAGE_BUFFER, 1, vertexSSBO);
-        GL43.glBindBufferBase(GL43.GL_SHADER_STORAGE_BUFFER, 2, normalSSBO);
+        if (SPHERES) {
+            setupForSpheres();
+        } else {
+            setupForTringles();
+        }
+
+        glUseProgram(rayProgram);
 
         glDispatchCompute(work_x, work_y, 1);
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     }
 
-    private void setupExecRay() {
+    private void setupForSpheres() {
         for (int i = 0; i < scene.length; i++) {
             Sphere sphere = scene[i];
             GL41.glProgramUniform3f(rayProgram, GL41.glGetUniformLocation(rayProgram, String.format("spheres[%d].location", i)), sphere.center.x, sphere.center.y, sphere.center.z);
@@ -395,10 +405,17 @@ public class Main {
             GL41.glProgramUniform1f(rayProgram, GL41.glGetUniformLocation(rayProgram, String.format("spheres[%d].radius", i)), sphere.radius);
             GL41.glProgramUniform1f(rayProgram, GL41.glGetUniformLocation(rayProgram, String.format("spheres[%d].shininess", i)), sphere.shininess);
         }
+    }
 
-        for (int i = 0; i < lights.length / 3; i++) {
-            GL41.glProgramUniform3f(rayProgram, GL41.glGetUniformLocation(rayProgram, String.format("lights[%d].location", i)), lights[(3 * i)], lights[(3 * i) + 1], lights[(3 * i) + 2]);
-            GL41.glProgramUniform1i(rayProgram, GL41.glGetUniformLocation(rayProgram, String.format("lights[%d].toggle", i)), lightswitch[i] ? 1 : 0);
+    private void setupForTringles() {
+        GL43.glProgramUniform1i(rayProgram, 3, tringle_amount);
+
+        GL43.glBindBufferBase(GL43.GL_SHADER_STORAGE_BUFFER, 1, vertexSSBO);
+        GL43.glBindBufferBase(GL43.GL_SHADER_STORAGE_BUFFER, 2, normalSSBO);
+
+        if (updated) {
+            setupTriangle();
+            updated = false;
         }
     }
 
@@ -590,16 +607,14 @@ public class Main {
                     case GLFW_KEY_MINUS:
                         fov = Math.max(fov - 0.02f, 0.2f);
                         break;
-                    case GLFW_KEY_T:
+                    case GLFW_KEY_F:
                         showfps = !showfps;
                         toRemove.add(keyPressed);
                         break;
                     case GLFW_KEY_D:
                         System.out.println("-----------Debug-----------");
+                        System.out.println(String.format("AvgFrametime: \t%f", avgframetime/counter));
                         System.out.println("Camera: \t" + camera + ", Forward:" + forward.toString());
-                        for (Triangle triangle : tringles) {
-                            System.out.println("Triangles: \t" + triangle.toString());
-                        }
                         System.out.println("---------------------------");
                         toRemove.add(keyPressed);
                         break;
